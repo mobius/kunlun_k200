@@ -1,0 +1,1 @@
+savedcmd_/mnt/storage/test_xpu/kunlun-driver/kunlun_module/kunlun_peermem.mod := printf '%s\n'   kunlun_peermem/kunlun_peermem.o | awk '!x[$$0]++ { print("/mnt/storage/test_xpu/kunlun-driver/kunlun_module/"$$0) }' > /mnt/storage/test_xpu/kunlun-driver/kunlun_module/kunlun_peermem.mod

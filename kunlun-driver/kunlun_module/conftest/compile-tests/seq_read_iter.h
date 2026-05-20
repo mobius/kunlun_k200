@@ -1,0 +1,1 @@
+#define NV_SEQ_READ_ITER_PRESENT

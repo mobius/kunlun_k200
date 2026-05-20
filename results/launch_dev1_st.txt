@@ -1,0 +1,410 @@
+[ INFO][main:413] ---- test config ----
+[ INFO][main:414]  dev_id     : 1
+[ INFO][main:415]  thread_num : 1
+[ INFO][main:416]  length     : 5120
+[ INFO][main:417]  loop       : 100
+[ INFO][main:418]  use_stream : False
+[ INFO][main:420]  kernel_num : 10
+[ INFO][main:424]  verbose    : false
+[ INFO][main:425]  perf       : true
+t_0 p_607 ite_0 kn=10
+  launch cost(us): total= 35 ave= 3.5
+  wait cost total= 159 ave= 15.9
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_1 kn=10
+  launch cost(us): total= 35 ave= 3.5
+  wait cost total= 158 ave= 15.8
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_2 kn=10
+  launch cost(us): total= 36 ave= 3.6
+  wait cost total= 157 ave= 15.7
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_3 kn=10
+  launch cost(us): total= 35 ave= 3.5
+  wait cost total= 159 ave= 15.9
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_4 kn=10
+  launch cost(us): total= 36 ave= 3.6
+  wait cost total= 158 ave= 15.8
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_5 kn=10
+  launch cost(us): total= 35 ave= 3.5
+  wait cost total= 159 ave= 15.9
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_6 kn=10
+  launch cost(us): total= 35 ave= 3.5
+  wait cost total= 158 ave= 15.8
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_7 kn=10
+  launch cost(us): total= 35 ave= 3.5
+  wait cost total= 158 ave= 15.8
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_8 kn=10
+  launch cost(us): total= 36 ave= 3.6
+  wait cost total= 158 ave= 15.8
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_9 kn=10
+  launch cost(us): total= 37 ave= 3.7
+  wait cost total= 157 ave= 15.7
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_10 kn=10
+  launch cost(us): total= 36 ave= 3.6
+  wait cost total= 158 ave= 15.8
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_11 kn=10
+  launch cost(us): total= 34 ave= 3.4
+  wait cost total= 159 ave= 15.9
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_12 kn=10
+  launch cost(us): total= 36 ave= 3.6
+  wait cost total= 158 ave= 15.8
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_13 kn=10
+  launch cost(us): total= 43 ave= 4.3
+  wait cost total= 151 ave= 15.1
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_14 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_15 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_16 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_17 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_18 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_19 kn=10
+  launch cost(us): total= 21 ave= 2.1
+  wait cost total= 172 ave= 17.2
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_20 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_21 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_22 kn=10
+  launch cost(us): total= 21 ave= 2.1
+  wait cost total= 172 ave= 17.2
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_23 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_24 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_25 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_26 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_27 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_28 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_29 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 171 ave= 17.1
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_30 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_31 kn=10
+  launch cost(us): total= 21 ave= 2.1
+  wait cost total= 172 ave= 17.2
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_32 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_33 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 171 ave= 17.1
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_34 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_35 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_36 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 171 ave= 17.1
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_37 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_38 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_39 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_40 kn=10
+  launch cost(us): total= 21 ave= 2.1
+  wait cost total= 171 ave= 17.1
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_41 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_42 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_43 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_44 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_45 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_46 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_47 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_48 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_49 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_50 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_51 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_52 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_53 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_54 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_55 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_56 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_57 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_58 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_59 kn=10
+  launch cost(us): total= 24 ave= 2.4
+  wait cost total= 170 ave= 17
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_60 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_61 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_62 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_63 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_64 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_65 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_66 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_67 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 172 ave= 17.2
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_68 kn=10
+  launch cost(us): total= 24 ave= 2.4
+  wait cost total= 168 ave= 16.8
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_69 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_70 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_71 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_72 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 168 ave= 16.8
+  all cost total= 191 ave= 19.1
+t_0 p_607 ite_73 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_74 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_75 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_76 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_77 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_78 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_79 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_80 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_81 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_82 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_83 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_84 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_85 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_86 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_87 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_88 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_89 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_90 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_91 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_92 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_93 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_94 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 171 ave= 17.1
+  all cost total= 194 ave= 19.4
+t_0 p_607 ite_95 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 169 ave= 16.9
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_96 kn=10
+  launch cost(us): total= 24 ave= 2.4
+  wait cost total= 169 ave= 16.9
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_97 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 171 ave= 17.1
+  all cost total= 193 ave= 19.3
+t_0 p_607 ite_98 kn=10
+  launch cost(us): total= 22 ave= 2.2
+  wait cost total= 170 ave= 17
+  all cost total= 192 ave= 19.2
+t_0 p_607 ite_99 kn=10
+  launch cost(us): total= 23 ave= 2.3
+  wait cost total= 170 ave= 17
+  all cost total= 193 ave= 19.3
+PASS

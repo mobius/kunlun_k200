@@ -1,0 +1,1 @@
+#define NV_OF_GET_NAME_GPIO_PRESENT

@@ -1,0 +1,1 @@
+#define NV_PCI_DEV_HAS_ATS_ENABLED

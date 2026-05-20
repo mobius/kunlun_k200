@@ -1,0 +1,1 @@
+#define NV_GPIO_GET_VALUE_PRESENT

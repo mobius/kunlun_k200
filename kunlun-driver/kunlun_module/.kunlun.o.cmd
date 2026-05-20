@@ -1,0 +1,1 @@
+savedcmd_/mnt/storage/test_xpu/kunlun-driver/kunlun_module/kunlun.o := ld -m elf_x86_64 -z noexecstack   -r -o /mnt/storage/test_xpu/kunlun-driver/kunlun_module/kunlun.o @/mnt/storage/test_xpu/kunlun-driver/kunlun_module/kunlun.mod 

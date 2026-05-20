@@ -1,0 +1,35 @@
+[WARN][XPURT][xpu_llhost_register:465] ioctl() fail, (807) Unknown IOCTL command
+xpu_host_register() fail, but dma test should be ok
+[WARN][XPURT][xpu_llhost_register:465] ioctl() fail, (807) Unknown IOCTL command
+xpu_host_register() fail, but dma test should be ok
+[WARN][XPURT][xpu_llhost_unregister:479] ioctl() fail, (807) Unknown IOCTL command
+xpu_host_unregister failed.
+[WARN][XPURT][xpu_llhost_unregister:479] ioctl() fail, (807) Unknown IOCTL command
+xpu_host_unregister failed.
+==== TEST PLAN ====
+DevID:          0
+XpuAddr:        0x20c100000
+Size:           0x10000000
+UseTHP:         true
+HostRegister:   true
+HostAlloc:      false
+CheckIntegrity: true
+Verbose:        false
+
+==== Integrity Result for user speed test ====-
+error_count= 0
+
+==== Integrity Result for pcie speed test ====-
+error_count= 0
+
+=== Performance Result ===
+HOST_TO_DEVICE
+  AverageUserTime(us): 50818.332031
+  AverageUserSpeed(GB/s): 4.919485
+  AveragePCIeTime(us): 58294.949219
+  AveragePCIeSpeed(GB/s): 4.288536
+DEVICE_TO_HOST
+  AverageUserTime(us): 58595.000000
+  AverageUserSpeed(GB/s): 4.266576
+  AveragePCIeTime(us): 56927.230469
+  AveragePCIeSpeed(GB/s): 4.391571

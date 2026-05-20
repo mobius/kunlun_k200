@@ -1,0 +1,1 @@
+KERNEL=="xpu*",MODE="0666"

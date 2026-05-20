@@ -1,0 +1,30 @@
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu2 {
+
+__global__ void sub1(const float* x, float* y, int len) {
+    int cid = core_id();
+    int ncores = core_num();
+    if (cid >= ncores) {
+        return;
+    }
+    int tid = cid * cluster_num() + cluster_id();   // better than ncores * cluster_id() + cid;
+    int nthreads = ncores * cluster_num();
+
+    const int buf_size = 128;
+    __simd__ float local_x[buf_size];
+    __simd__ float local_y[buf_size];
+
+    int start = -1;
+    int end = -1;
+    partition(tid, nthreads, len, 16, &start, &end);
+    for (int i = start; i < end; i += buf_size) {
+        int read_len = min(buf_size, end - i);
+        GM2LM(x + i, local_x, read_len * sizeof(float));
+        primitive_add(-1.0f, local_x, local_y, read_len);
+        LM2GM(local_y, y + i, read_len * sizeof(float));
+    }
+}
+
+}

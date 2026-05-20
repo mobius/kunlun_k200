@@ -1,0 +1,10 @@
+#ifndef BAIDU_XPU_API_SRC_KERNEL_INCLUDE_XPU_KERNEL_CLUSTER1_TYPE_H
+#define BAIDU_XPU_API_SRC_KERNEL_INCLUDE_XPU_KERNEL_CLUSTER1_TYPE_H
+
+#ifdef __xpu__
+typedef struct {
+    unsigned short val;
+} float16;
+#endif // __xpu__
+
+#endif // BAIDU_XPU_API_SRC_KERNEL_INCLUDE_XPU_KERNEL_CLUSTER_TYPE_H

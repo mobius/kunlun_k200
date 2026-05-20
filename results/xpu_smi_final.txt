@@ -1,0 +1,114 @@
+Runtime Version: 4.33
+Driver Version: 4.33
+Product Brand: KUNLUNXIN
+  DEVICES
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| DevID |   PCI Addr   | Model |        SN        |    INODE   | State | UseRate |     L3     |     Memory     | Power(W) | Temp | Freq(MHz) | Firmware Version | CPLD Version |
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+|     0 | 0000:43:00.0 | K200  | 0200210903000315 | /dev/xpu0  |     N |     3 % |  0 / 16 MB |    3 / 8064 MB |       38 |   37 |       900 | 0001.0016.0022   |       ce3002 |
+|     1 | 0000:43:00.0 | K200  | 0200210903000315 | /dev/xpu1  |     N |     3 % | 12 / 16 MB |    1 / 8064 MB |       38 |   37 |       900 | 0001.0016.0022   |       ce3002 |
+|     2 | 0000:44:00.0 | K200  | 0200210903000143 | /dev/xpu2  |     N |     4 % | 13 / 16 MB |    3 / 8064 MB |       37 |   38 |       900 | 0001.0016.0021   |       ce3002 |
+|     3 | 0000:44:00.0 | K200  | 0200210903000143 | /dev/xpu3  |     N |     4 % | 13 / 16 MB | 1025 / 8064 MB |       37 |   36 |       900 | 0001.0016.0021   |       ce3002 |
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  VIDEO
+---------------------------------------
+| DevID | Model | DEC | ENC | IMGPROC |
+---------------------------------------
+|     0 |  K200 | N/A | N/A |     N/A |
+|     1 |  K200 | N/A | N/A |     N/A |
+|     2 |  K200 | N/A | N/A |     N/A |
+|     3 |  K200 | N/A | N/A |     N/A |
+---------------------------------------
+  PROCESSES
+--------------------------------------------------------------
+| DevID |  PID  | Streams |  L3  | Memory  |     Command     |
+--------------------------------------------------------------
+| 0     | 89865 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89885 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89905 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89925 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89945 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89965 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89985 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 90005 | 2       | 0 MB |    1 MB | test_memcpy_pee |
+|       | 90012 | 2       | 0 MB |    1 MB | test_memcpy_pee |
+|       | 90019 | 2       | 0 MB |    1 MB | test_memcpy_pee |
+|       | 90026 | 1       | 0 MB |    0 MB | test_memcpy_pee |
+|       | 90032 | 2       | 0 MB |    0 MB | test_launch     |
+|       | 90038 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90043 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90048 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90053 | 6       | 0 MB |    0 MB | test_launch     |
+|       | 90065 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90077 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90089 | 1       | 0 MB |    0 MB | test_launch     |
+| 1     | 89844 | 2       | 4 MB |    0 MB | test_dma        |
+|       | 89865 | 2       | 8 MB |    0 MB | test_dma        |
+|       | 89885 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89905 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89925 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89945 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89965 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89985 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 90005 | 1       | 0 MB |    0 MB | test_memcpy_pee |
+|       | 90012 | 1       | 0 MB |    0 MB | test_memcpy_pee |
+|       | 90019 | 2       | 0 MB |    1 MB | test_memcpy_pee |
+|       | 90026 | 1       | 0 MB |    0 MB | test_memcpy_pee |
+|       | 90032 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90038 | 2       | 0 MB |    0 MB | test_launch     |
+|       | 90043 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90048 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90053 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90065 | 6       | 0 MB |    0 MB | test_launch     |
+|       | 90077 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90089 | 1       | 0 MB |    0 MB | test_launch     |
+| 2     | 89764 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89784 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89804 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89824 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89844 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89865 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89885 | 2       | 1 MB |    0 MB | test_dma        |
+|       | 89905 | 2       | 4 MB |    0 MB | test_dma        |
+|       | 89925 | 2       | 8 MB |    0 MB | test_dma        |
+|       | 89945 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89965 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89985 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 90005 | 2       | 0 MB |    1 MB | test_memcpy_pee |
+|       | 90012 | 2       | 0 MB |    1 MB | test_memcpy_pee |
+|       | 90019 | 1       | 0 MB |    0 MB | test_memcpy_pee |
+|       | 90026 | 2       | 0 MB |    1 MB | test_memcpy_pee |
+|       | 90032 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90038 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90043 | 2       | 0 MB |    0 MB | test_launch     |
+|       | 90048 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90053 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90065 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90077 | 6       | 0 MB |    0 MB | test_launch     |
+|       | 90089 | 1       | 0 MB |    0 MB | test_launch     |
+| 3     | 89724 | 1       | 0 MB | 1024 MB | test_dma        |
+|       | 89764 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89784 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89804 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89824 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89844 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89865 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89885 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89905 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89925 | 1       | 0 MB |    0 MB | test_dma        |
+|       | 89945 | 2       | 1 MB |    0 MB | test_dma        |
+|       | 89965 | 2       | 4 MB |    0 MB | test_dma        |
+|       | 89985 | 2       | 8 MB |    0 MB | test_dma        |
+|       | 90005 | 1       | 0 MB |    0 MB | test_memcpy_pee |
+|       | 90012 | 1       | 0 MB |    0 MB | test_memcpy_pee |
+|       | 90019 | 1       | 0 MB |    0 MB | test_memcpy_pee |
+|       | 90026 | 2       | 0 MB |    1 MB | test_memcpy_pee |
+|       | 90032 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90038 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90043 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90048 | 2       | 0 MB |    0 MB | test_launch     |
+|       | 90053 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90065 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90077 | 1       | 0 MB |    0 MB | test_launch     |
+|       | 90089 | 6       | 0 MB |    0 MB | test_launch     |
+--------------------------------------------------------------

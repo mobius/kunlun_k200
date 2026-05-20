@@ -1,0 +1,1 @@
+savedcmd_/mnt/storage/test_xpu/kunlun-driver/kunlun_module/modules.order := {   echo /mnt/storage/test_xpu/kunlun-driver/kunlun_module/kunlun.o;   echo /mnt/storage/test_xpu/kunlun-driver/kunlun_module/kunlun_peermem.o; :; } > /mnt/storage/test_xpu/kunlun-driver/kunlun_module/modules.order

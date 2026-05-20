@@ -1,0 +1,1 @@
+#define NV_GPIO_SET_VALUE_PRESENT

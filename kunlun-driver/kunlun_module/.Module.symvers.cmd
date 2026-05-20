@@ -1,0 +1,1 @@
+savedcmd_/mnt/storage/test_xpu/kunlun-driver/kunlun_module/Module.symvers :=  scripts/mod/modpost -M -m -a      -o /mnt/storage/test_xpu/kunlun-driver/kunlun_module/Module.symvers -T /mnt/storage/test_xpu/kunlun-driver/kunlun_module/modules.order -i Module.symvers -e 

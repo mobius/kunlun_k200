@@ -1,0 +1,28 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Compiled test binaries
+xpu_perf_test
+xpu_denoise
+test_p2p
+test_p2p_verify
+test_bw
+test_pinned
+test_pinned2
+
+# Kernel module binaries
+*.ko
+*.o
+*.mod
+*.mod.c
+*.mod.o
+*.order
+*.symvers
+
+# DeepSeek TUI
+.deepseek/
+
+# Large tarball (already extracted)
+xdnn-ubuntu_x86_64.tar.gz
