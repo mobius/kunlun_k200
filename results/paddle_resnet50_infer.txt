@@ -1,7 +1,0 @@
-ResNet-50 Paddle Inference XPU Benchmark
-Date: 2026-05-07 21:30:52
-Batch size: 1
-Input: 224x224
-Runs: 100
-Avg latency: 0.94 ms/batch
-Throughput: 1068.7 images/sec

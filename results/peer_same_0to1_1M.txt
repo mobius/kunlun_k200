@@ -1,4 +1,0 @@
-[WARN][XPURT][xpu_llmemcpy_p2p_direct:445] ioctl() fail, (807) Unknown IOCTL command
-[WARN][XPURT][xpu_llmemcpy_p2p:419] ioctl() fail, (807) Unknown IOCTL command
-xpu_memcpy_peer(1, 0x608000000, 0, 0x208200000, 1048576) error
-xpu_memcpy_peer(1, 0x608000000, 0, 0x208200000, 1048576)
