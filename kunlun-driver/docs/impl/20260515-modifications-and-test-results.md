@@ -114,3 +114,45 @@ int ioctl_memcpy_p2p_kl1(struct xpu_pd *xpd, void __user *argp) {
 - **备份**: 原模块 `kunlun.ko.bak` (BuildID: 798c818f), 源文件 `/mnt/storage/test_xpu/kunlun.ko.orig`
 - **XPURT**: `/usr/local/xpu-4.33.0/lib64/libxpurt.so.1`
 - **测试工具**: `/mnt/storage/test_xpu/test_p2p_verify`, `test_p2p`, `test_bw`
+
+## 6. 构建可复现性 (2026-05-20 验证)
+
+### 6.1 源码完整性
+
+```
+kunlun-driver 追踪文件: 436
+├── 源码 (.c/.h):  199 files
+├── conftest 头:    152 files (编译时生成, 已缓存)
+├── 构建文件:         3 files (Makefile, Kbuild, conftest.sh)
+├── 文档:            3 files (docs/research|plan|impl)
+└── 其他:           79 files (clang-format, udev, 版权等)
+```
+
+### 6.2 构建命令
+
+```bash
+cd kunlun-driver && make modules
+# 输出: kunlun.ko (21.5 MB, with debug_info)
+```
+
+### 6.3 外部依赖
+
+| 依赖 | 来源 | 必要性 |
+|------|------|:-----:|
+| kernel headers | `linux-headers-$(uname -r)` (系统包) | 必须 |
+| GCC | 系统包 (12.3.0 已验证) | 必须 |
+| ld | binutils | 必须 |
+
+无其他外部工具链依赖。Makefile 自动检测 `/lib/modules/$(uname -r)/build`。
+
+### 6.4 未追踪文件
+
+| 文件 | 原因 |
+|------|------|
+| `*.ko, *.o, *.mod, *.mod.c, ...` | 编译产物, .gitignore |
+| `kunlun.ko.new`, `kunlun.ko.orig` | 父仓库 .gitignore |
+| `conftest/*` 重新生成 | 若内核版本不同, conftest 自动重跑 |
+
+### 6.5 跨内核编译注意
+
+conftest 缓存在 `kunlun_module/conftest/compile-tests/*.h`，针对内核 6.8.0-111-generic 生成。换内核版本时 `make modules` 会自动重新运行 `conftest.sh` 并覆盖这些文件 — git 会显示它们被修改。这是正常行为，无需提交新版本。
