@@ -94,7 +94,7 @@ enum {
 
     KL1_DMA_LENGTH_ALIGNMENT = 256, // Minimal DMA size
     KL1_NUM_KBUF             = 2,
-    KL1_DMA_KBUF_SIZE        = 4 * 1024 * 1024,
+    KL1_DMA_KBUF_SIZE        = 1 * 1024 * 1024,
 };
 
 /***********************

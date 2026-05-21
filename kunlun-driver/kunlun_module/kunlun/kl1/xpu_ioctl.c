@@ -1238,13 +1238,6 @@ int ioctl_memcpy_p2p_kl1(struct xpu_pd *xpd, void __user *argp)
     args.src  = args.src & (~(0xfULL << 60));
     args.dest = args.dest & (~(0xfULL << 60));
 
-    LOGI("[P2P] src_raw=0x%llx dst_raw=0x%llx sz=0x%llx src_dev=%d dst_dev=%d\n",
-         args.src | ((u64)src_devid << 60), args.dest | ((u64)dst_devid << 60),
-         args.size, src_devid, dst_devid);
-    LOGI("[P2P] src_bar=0x%llx dst_bar=0x%llx (rbase src=0x%llx dst=0x%llx)\n",
-         args.src + xpd->rbase, args.dest + dst_xpd->rbase,
-         xpd->rbase, dst_xpd->rbase);
-
     if (src_devid != xpd->devfile_id) {
         LOGW("P2P src_devid %d != session devfile %d\n", src_devid, xpd->devfile_id);
         return -EINVAL;

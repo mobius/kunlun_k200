@@ -341,10 +341,6 @@ static int ioctl_set_numvfs(void __user *argp)
 
 static long ctrldev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-    if (_IOC_NR(cmd) == 14 || _IOC_NR(cmd) == 146) {
-        LOGI("[ctrl] ioctl nr=%d type=0x%x size=%d\n",
-             _IOC_NR(cmd), _IOC_TYPE(cmd), _IOC_SIZE(cmd));
-    }
     void __user *argp = (void __user *)arg;
     int          ret  = -XPUERR_DEVINIT;
 

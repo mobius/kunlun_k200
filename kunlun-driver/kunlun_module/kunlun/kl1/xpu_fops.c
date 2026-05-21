@@ -118,14 +118,6 @@ long xpu_char_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     struct xpu_pd      *xpd;
     int                 ret = 0;
 
-    /* Log P2P-related ioctls to debug dispatch */
-    if (cmd == IOCTL_MEMCPY_P2P || cmd == IOCTL_MEMCPY_P2P_DIRECT ||
-        _IOC_NR(cmd) == 14 || _IOC_NR(cmd) == 146) {
-        LOGI("[xpu_%d] ioctl cmd=0x%x type=0x%x nr=%d size=%d\n",
-             xsess ? xsess->xpd->devfile_id : -1,
-             cmd, _IOC_TYPE(cmd), _IOC_NR(cmd), _IOC_SIZE(cmd));
-    }
-
     if (xsess == NULL) {
         LOGE("xpd is NULL\n");
         return -XPUERR_UNEXPECT;

@@ -55,10 +55,6 @@ static int kl_char_release(struct inode *inode, struct file *file)
 static long kl_char_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
     struct kl_inode *kinode = inode_to_kinode(file->f_inode);
-    if (_IOC_NR(cmd) == 14 || _IOC_NR(cmd) == 146) {
-        LOGI("[kl_fops] ioctl nr=%d type=0x%x size=%d minor=%d\n",
-             _IOC_NR(cmd), _IOC_TYPE(cmd), _IOC_SIZE(cmd), kinode->minor);
-    }
     if (kinode->fops && kinode->fops->unlocked_ioctl) {
         return kinode->fops->unlocked_ioctl(file, cmd, arg);
     }
