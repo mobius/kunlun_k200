@@ -59,39 +59,44 @@ K200 leads in FP16 throughput and launch latency (ideal for small-batch inferenc
 
 ```
 .
-├── xpu_perf_test.cpp          # Optimized benchmark (FP16/FP32/INT8 GEMM, D2D, launch)
-├── test_p2p.cpp               # P2P DMA test (same-card PD→PD)
-├── test_p2p_verify.cpp        # P2P data verification (reads back & checks)
-├── xpu_denoise.cpp            # XPU denoising kernel
-├── paddle_infer_benchmark.py  # PaddlePaddle ResNet-50 inference script
-├── resnet50_benchmark.py      # Paddle model loading & warmup
-├── run_perf_tests.sh          # Batch runner for all perf tests
-├── run_paddle_benchmark.sh    # Paddle benchmark runner
-├── results/                   # Test output logs & performance summaries
-│   ├── PERF_SUMMARY.md
-│   ├── K200_ANALYSIS_REPORT.md
-│   └── *.txt                  # Raw device outputs
-├── paddle_models/             # PaddlePaddle model archive
+├── benchmarks/
+│   ├── xpu_perf_test.cpp       # GEMM compute benchmark (FP16/FP32/INT8)
+│   └── xpu_denoise.cpp         # XPU denoising kernel example
+├── tests/
+│   ├── test_p2p.cpp            # P2P DMA test (same-card PD→PD)
+│   └── test_p2p_verify.cpp     # P2P data verification (read-back + checksum)
+├── scripts/
+│   ├── run_perf_tests.sh       # Batch runner for all perf tests
+│   ├── run_paddle_benchmark.sh # Paddle inference benchmark runner
+│   ├── run_paddle_infer_benchmark.sh
+│   ├── paddle_infer_benchmark.py
+│   ├── resnet50_benchmark.py
+│   ├── convert_weights.py
+│   ├── gen_synthetic_weights.py
+│   ├── test_pipeline.py
+│   └── train_denoise.py
+├── data/
+│   └── xpu_denoise_synth.bin   # Synthetic weights for denoise test
+├── results/
+│   ├── PERF_SUMMARY.md         # Performance test summary
+│   └── K200_ANALYSIS_REPORT.md # Hardware analysis report
+├── paddle_models/              # PaddlePaddle model archive
 │   ├── inference.pdmodel
-│   ├── inference.pdiparams
+│   ├── inference.pdiparams     (Git LFS)
 │   └── inference.pdiparams.info
-├── xdnn-ubuntu_x86_64/        # xdnn SDK 2.0.0.725
-│   ├── include/               # xdnn headers & kernel libs
-│   ├── lib/                   # Static API library
-│   ├── so/                    # Shared runtime (libxpurt.so.1)
-│   └── plugin/                # xdnn plugin example
+├── xdnn-ubuntu_x86_64/         # xdnn SDK 2.0.0.725
+│   ├── include/                # xdnn headers & kernel libs
+│   ├── lib/                    # Static API library (LFS)
+│   ├── so/                     # Shared runtime (LFS)
+│   └── plugin/                 # xdnn plugin example
 ├── kunlun-driver/              # Kernel driver 4.33 + modifications
 │   ├── docs/
 │   │   ├── research/           # Architecture analysis
 │   │   ├── plan/               # Iteration plans & risk assessment
 │   │   └── impl/               # Code changes & test results
-│   ├── kunlun_module/
-│   │   └── kunlun/
-│   │       ├── kl1/            # KL1 driver (K200) — modified
-│   │       └── kl2/            # KL2 driver (R200/R300) — unchanged
-│   └── kunlun.ko               # Compiled module (debug info retained)
-├── .gitattributes              # LFS tracking rules
-├── .gitignore
+│   └── kunlun_module/kunlun/
+│       ├── kl1/                # KL1 driver (K200) — modified
+│       └── kl2/                # KL2 driver (R200/R300) — unchanged
 └── README.md
 ```
 
@@ -141,18 +146,30 @@ All changes are limited to KL1 code path (K200/K100 only — R200/R300 unaffecte
 
 ### GEMM benchmark
 ```bash
-g++ -std=c++17 -O2 -o xpu_perf_test xpu_perf_test.cpp \
+g++ -std=c++17 -O2 -o benchmarks/xpu_perf_test benchmarks/xpu_perf_test.cpp \
   -I xdnn-ubuntu_x86_64/include -I /usr/local/xpu-4.33.0/include \
   -L xdnn-ubuntu_x86_64/so -L /usr/local/xpu-4.33.0/lib64 \
   -lxpurt -lxpuapi -lpthread -lnuma \
   -Wl,-rpath,xdnn-ubuntu_x86_64/so -Wl,-rpath,/usr/local/xpu-4.33.0/lib64
 
-./xpu_perf_test 2>&1 | tee results/compute_$(date +%Y%m%d).txt
+./benchmarks/xpu_perf_test
+```
+
+### P2P tests
+```bash
+g++ -std=c++17 -O2 -o tests/test_p2p tests/test_p2p.cpp \
+  -I xdnn-ubuntu_x86_64/include -I /usr/local/xpu-4.33.0/include \
+  -L xdnn-ubuntu_x86_64/so -L /usr/local/xpu-4.33.0/lib64 \
+  -lxpurt -lxpuapi \
+  -Wl,-rpath,xdnn-ubuntu_x86_64/so -Wl,-rpath,/usr/local/xpu-4.33.0/lib64
+
+./tests/test_p2p
+./tests/test_p2p_verify
 ```
 
 ### Paddle inference
 ```bash
-python3 paddle_infer_benchmark.py --model paddle_models --batch_size 1
+python3 scripts/paddle_infer_benchmark.py --model paddle_models --batch_size 1
 ```
 
 ### Driver rebuild

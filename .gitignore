@@ -3,14 +3,14 @@
 __pycache__/
 *.pyc
 
-# Compiled test binaries
-xpu_perf_test
-xpu_denoise
-test_p2p
-test_p2p_verify
-test_bw
-test_pinned
-test_pinned2
+# Compiled binaries (benchmarks + tests)
+benchmarks/xpu_perf_test
+benchmarks/xpu_denoise
+tests/test_p2p
+tests/test_p2p_verify
+tests/test_bw
+tests/test_pinned
+tests/test_pinned2
 
 # Kernel module binaries
 *.ko
