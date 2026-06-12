@@ -23,10 +23,12 @@
 
 #define __FILENAME__ "xpu_dma.c"
 
+#include <linux/dma-mapping.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
+#include <linux/sched/mm.h>
 #include "xpu_drv.h"
 #include "xpu_hw.h"
 
@@ -162,18 +164,165 @@ static inline void put_channel(spinlock_t *lock, unsigned long *bitmap, int ch)
 #define put_rdch(xpd, ch) put_channel(&((xpd)->rdch_bitmap_lock), &((xpd)->rdch_bitmap), (ch))
 #define put_wrch(xpd, ch) put_channel(&((xpd)->wrch_bitmap_lock), &((xpd)->wrch_bitmap), (ch))
 
+/* S4 spike: EDMA directly to/from dma_map_page(host_alloc page), skip bounce copy. */
+static int kl1_edma_h2d_page(struct xpu_edma *edma, u64 dst_dev, struct page *page,
+                             unsigned int offset, size_t len, u64 *cycles)
+{
+    struct device *dev = &edma->xpd->xdev->pdev->dev;
+    dma_addr_t     dma_addr;
+    int            ret;
+
+    dma_addr = dma_map_page(dev, page, offset, len, DMA_TO_DEVICE);
+    if (dma_mapping_error(dev, dma_addr))
+        return -EIO;
+
+    mutex_lock(&edma->lock);
+    ret = xpuhw_edma_read_locked(edma, dst_dev, (u64)dma_addr, len, cycles);
+    mutex_unlock(&edma->lock);
+
+    dma_unmap_page(dev, dma_addr, len, DMA_TO_DEVICE);
+    return ret;
+}
+
+static int kl1_edma_d2h_page(struct xpu_edma *edma, u64 src_dev, struct page *page,
+                             unsigned int offset, size_t len, u64 *cycles)
+{
+    struct device *dev = &edma->xpd->xdev->pdev->dev;
+    dma_addr_t     dma_addr;
+    int            ret;
+
+    dma_addr = dma_map_page(dev, page, offset, len, DMA_FROM_DEVICE);
+    if (dma_mapping_error(dev, dma_addr))
+        return -EIO;
+
+    mutex_lock(&edma->lock);
+    ret = xpuhw_edma_write_locked(edma, (u64)dma_addr, src_dev, len, cycles);
+    mutex_unlock(&edma->lock);
+
+    dma_unmap_page(dev, dma_addr, len, DMA_FROM_DEVICE);
+    return ret;
+}
+
+static int dma_host_to_device_direct(struct xpu_pd *xpd, u64 dst, unsigned long src_u, u64 cpsz,
+                                     u64 *total_cycles)
+{
+    struct mm_struct *mm = current->mm;
+    int               ch = -1, ret = 0;
+    u64               cycles = 0, done = 0;
+    struct xpu_edma  *edma;
+
+    if (!mm || !total_cycles)
+        return -XPUERR_INVALID_PARAM;
+
+    if (down_timeout(&xpd->rdch_sema, 5 * HZ)) {
+        LOGW("[xpu_%d] S4 H2D rdch_sema timeout\n", xpd->devfile_id);
+        return -XPUERR_TIMEOUT;
+    }
+
+    ch = get_rdch(xpd);
+    if (ch < 0) {
+        ret = -EFAULT;
+        goto out_up;
+    }
+
+    edma          = &xpd->rdch_edma[ch];
+    *total_cycles = 0;
+    LOGI("[xpu_%d] S4 H2D direct src=0x%lx sz=0x%llx\n", xpd->devfile_id, src_u, cpsz);
+
+    while (done < cpsz) {
+        struct page   *page;
+        unsigned int   pgoff;
+        size_t         run = min_t(size_t, cpsz - done, KL1_DMA_KBUF_SIZE);
+        size_t         seg;
+
+        ret = kl1_host_alloc_get_page(mm, src_u + done, &page, &pgoff);
+        if (ret)
+            break;
+
+        seg = min(run, (size_t)PAGE_SIZE - pgoff);
+        ret = kl1_edma_h2d_page(edma, dst + done, page, pgoff, seg, &cycles);
+        put_page(page);
+        if (ret)
+            break;
+
+        *total_cycles += cycles;
+        done += seg;
+    }
+
+    put_rdch(xpd, ch);
+out_up:
+    up(&xpd->rdch_sema);
+    return ret;
+}
+
+static int dma_device_to_host_direct(struct xpu_pd *xpd, unsigned long dst_u, u64 src, u64 cpsz,
+                                     u64 *total_cycles)
+{
+    struct mm_struct *mm = current->mm;
+    int               ch = -1, ret = 0;
+    u64               cycles = 0, done = 0;
+    struct xpu_edma  *edma;
+
+    if (!mm || !total_cycles)
+        return -XPUERR_INVALID_PARAM;
+
+    if (down_timeout(&xpd->wrch_sema, 5 * HZ)) {
+        LOGW("[xpu_%d] S4 D2H wrch_sema timeout\n", xpd->devfile_id);
+        return -XPUERR_TIMEOUT;
+    }
+
+    ch = get_wrch(xpd);
+    if (ch < 0) {
+        ret = -EFAULT;
+        goto out_up;
+    }
+
+    edma          = &xpd->wrch_edma[ch];
+    *total_cycles = 0;
+    LOGI("[xpu_%d] S4 D2H direct dst=0x%lx sz=0x%llx\n", xpd->devfile_id, dst_u, cpsz);
+
+    while (done < cpsz) {
+        struct page   *page;
+        unsigned int   pgoff;
+        size_t         run = min_t(size_t, cpsz - done, KL1_DMA_KBUF_SIZE);
+        size_t         seg;
+
+        ret = kl1_host_alloc_get_page(mm, dst_u + done, &page, &pgoff);
+        if (ret)
+            break;
+
+        seg = min(run, (size_t)PAGE_SIZE - pgoff);
+        ret = kl1_edma_d2h_page(edma, src + done, page, pgoff, seg, &cycles);
+        put_page(page);
+        if (ret)
+            break;
+
+        *total_cycles += cycles;
+        done += seg;
+    }
+
+    put_wrch(xpd, ch);
+out_up:
+    up(&xpd->wrch_sema);
+    return ret;
+}
+
 /* Memcpy between device memory and host cpu memory
  * Memory will be split into multiple $KL1_DMA_KBUF_SIZE parts, and issue one DMA request for each
  * part.
  */
 int dma_device_to_host(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *total_cycles)
 {
+    struct mm_struct *mm = current->mm;
     int              i      = 0;
     int              ret    = 0;
     size_t           dmasz  = 0;
     int              ch     = -1;
     u64              cycles = 0;
     struct xpu_edma *edma;
+
+    if (kl1_dma_direct && mm && kl1_user_range_is_host_alloc(mm, (unsigned long)dst, cpsz))
+        return dma_device_to_host_direct(xpd, (unsigned long)dst, src, cpsz, total_cycles);
 
     if (total_cycles == NULL)
         return -XPUERR_INVALID_PARAM;
@@ -228,12 +377,16 @@ err_out:
 
 int dma_host_to_device(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *total_cycles)
 {
+    struct mm_struct *mm = current->mm;
     int              i      = 0;
     int              ret    = 0;
     size_t           dmasz  = 0;
     int              ch     = -1;
     u64              cycles = 0;
     struct xpu_edma *edma;
+
+    if (kl1_dma_direct && mm && kl1_user_range_is_host_alloc(mm, (unsigned long)src, cpsz))
+        return dma_host_to_device_direct(xpd, dst, (unsigned long)src, cpsz, total_cycles);
 
     if (total_cycles == NULL)
         return -XPUERR_INVALID_PARAM;

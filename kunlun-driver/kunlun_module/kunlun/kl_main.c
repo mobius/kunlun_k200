@@ -674,6 +674,10 @@ int kl1_p2p_stub;
 module_param(kl1_p2p_stub, int, 0644);
 MODULE_PARM_DESC(kl1_p2p_stub, "KL1 P2P stub mode (1=instant success, debug only)");
 
+int kl1_dma_direct;
+module_param(kl1_dma_direct, int, 0644);
+MODULE_PARM_DESC(kl1_dma_direct, "KL1 direct EDMA for xpu_host_alloc pages (S4 spike, 1=on)");
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("BAIDU-ISA");
 MODULE_DESCRIPTION("kunlun");

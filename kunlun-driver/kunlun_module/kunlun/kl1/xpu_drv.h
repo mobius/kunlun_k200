@@ -738,7 +738,11 @@ int  dma_device_to_device_p2p(struct xpu_pd *, u64 dst, u64 src, u64 sz, u64 *cy
 int  kl1_dma_peer_to_peer(struct xpu_pd *src_xpd, struct xpu_pd *dst_xpd, u64 dst, u64 src,
                           u64 sz, u64 *cycles);
 extern int kl1_p2p_stub;
+extern int kl1_dma_direct;
 int  kl1_mmap_host_alloc(struct xpu_pd *xpd, struct vm_area_struct *vma);
+bool kl1_user_range_is_host_alloc(struct mm_struct *mm, unsigned long uaddr, unsigned long len);
+int  kl1_host_alloc_get_page(struct mm_struct *mm, unsigned long uaddr, struct page **page_out,
+                             unsigned int *offset_out);
 
 // Get xpd by xxx
 struct xpu_pd *get_xpd_by_devfile_id(int dst_dev);

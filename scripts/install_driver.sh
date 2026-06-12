@@ -73,9 +73,13 @@ cp "$KO_SRC" "$KO_DST"
 echo "Installed ${KO_SRC} -> ${KO_DST}"
 
 depmod -a
-if [[ "${KL1_P2P_STUB:-0}" == "1" ]]; then
-    modprobe kunlun kl1_p2p_stub=1
-    echo "Loaded with kl1_p2p_stub=1 (debug)"
+MODARGS=()
+[[ "${KL1_P2P_STUB:-0}" == "1" ]] && MODARGS+=(kl1_p2p_stub=1)
+[[ "${KL1_DMA_DIRECT:-0}" == "1" ]] && MODARGS+=(kl1_dma_direct=1)
+
+if [[ ${#MODARGS[@]} -gt 0 ]]; then
+    modprobe kunlun "${MODARGS[@]}"
+    echo "Loaded with ${MODARGS[*]}"
 else
     modprobe kunlun
 fi
@@ -84,8 +88,9 @@ echo "Driver loaded:"
 modinfo kunlun | grep -E 'filename|version|srcversion|kl1_p2p'
 sha256sum "$KO_DST" "$KO_SRC"
 
-if [[ ! -f /sys/module/kunlun/parameters/kl1_p2p_stub ]]; then
-    die "kl1_p2p_stub sysfs missing — loaded module does not match ${KO_SRC}. Reboot and rerun."
-fi
-
-echo "kl1_p2p_stub=$(cat /sys/module/kunlun/parameters/kl1_p2p_stub)"
+for param in kl1_p2p_stub kl1_dma_direct; do
+    if [[ ! -f /sys/module/kunlun/parameters/${param} ]]; then
+        die "${param} sysfs missing — loaded module does not match ${KO_SRC}. Reboot and rerun."
+    fi
+    echo "${param}=$(cat /sys/module/kunlun/parameters/${param})"
+done
