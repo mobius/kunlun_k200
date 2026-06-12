@@ -40,4 +40,7 @@ clean:
 run: benchmarks/xpu_perf_test
 	./benchmarks/xpu_perf_test 0
 
-.PHONY: all clean run driver driver-install
+regression: tests/test_p2p_verify tests/test_host_alloc benchmarks/xpu_perf_test
+	scripts/run_driver_regression.sh
+
+.PHONY: all clean run driver driver-install regression
