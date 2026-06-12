@@ -12,8 +12,8 @@
 | 阶段 | 目标 | 预估工期 | 前置条件 |
 |:----:|------|:--------:|----------|
 | S0 | 环境就绪 + 基线复现 | 0.5 天 | 无 |
-| S1 | P2P host-staging 驱动实现 | 1–2 天 | S0 |
-| S2 | xpu_host_alloc mmap 实现 | 1–2 天 | S0 |
+| S1 | P2P host-staging 驱动实现 | 1–2 天 | S0 | **已完成** → `docs/impl/20260612-s1-p2p-fix-and-s2-mmap.md` |
+| S2 | xpu_host_alloc mmap 实现 | 1–2 天 | S0 | **已完成** → 同上 + `docs/impl/20260612-s1-s2-optimization-impact.md` |
 | S3 | INT8 性能探测 | 0.5–1 天 | S0 |
 | S4 | Pinned DMA 直传（可选） | 2–3 天 | S2 完成且验证有收益 |
 

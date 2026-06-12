@@ -159,3 +159,9 @@ KL1 stub 未 `copy_to_user` size → `munmap(ptr, 0)` → `XPUERR_INVALID_PARAM`
 ## 9. 调试参数
 
 `kl1_p2p_stub=1`（`kl_main.c` `module_param`）：P2P ioctl 立即成功，不搬数据，用于确认 ioctl 不 hang。生产使用保持 `0`。
+
+---
+
+## 10. 优化影响
+
+详见 `docs/impl/20260612-s1-s2-optimization-impact.md`。

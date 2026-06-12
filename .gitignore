@@ -16,6 +16,7 @@ tests/test_pinned2
 # Kernel module binaries
 *.ko
 *.o
+*.cmd
 *.mod
 *.mod.c
 *.mod.o
