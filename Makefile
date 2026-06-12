@@ -4,7 +4,7 @@ CXXFLAGS = -std=c++17 -O2 -I/usr/local/xpu-4.33.0/include -I$(ROOT)/xdnn-ubuntu_
 LDFLAGS = -L/usr/local/xpu-4.33.0/lib64 -L$(ROOT)/xdnn-ubuntu_x86_64/so -lxpuapi -lxpurt \
           -Wl,-rpath,/usr/local/xpu-4.33.0/lib64 -Wl,-rpath,$(ROOT)/xdnn-ubuntu_x86_64/so
 
-BENCHMARKS = benchmarks/xpu_perf_test benchmarks/xpu_denoise
+BENCHMARKS = benchmarks/xpu_perf_test benchmarks/xpu_denoise benchmarks/xpu_int8_probe
 TESTS = tests/test_p2p tests/test_p2p_verify tests/test_host_alloc
 
 all: $(BENCHMARKS) $(TESTS)
@@ -13,6 +13,9 @@ benchmarks/xpu_perf_test: benchmarks/xpu_perf_test.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
 
 benchmarks/xpu_denoise: benchmarks/xpu_denoise.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+
+benchmarks/xpu_int8_probe: benchmarks/xpu_int8_probe.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
 
 tests/test_p2p: tests/test_p2p.cpp

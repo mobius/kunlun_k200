@@ -6,6 +6,7 @@ __pycache__/
 # Compiled binaries (benchmarks + tests)
 benchmarks/xpu_perf_test
 benchmarks/xpu_denoise
+benchmarks/xpu_int8_probe
 tests/test_p2p
 tests/test_p2p_verify
 tests/test_host_alloc
