@@ -67,8 +67,54 @@ void test_bandwidth(int devid) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Pinned-memory bandwidth (xpu_host_alloc) — SKIPPED: xpu_host_alloc hangs lib init
+// 2. Pinned-memory bandwidth (xpu_host_alloc)
 // ---------------------------------------------------------------------------
+void test_bandwidth_pinned(int devid) {
+    xpu_set_device(devid);
+    printf("\n=== Bandwidth Test — xpu_host_alloc (Device %d) ===\n", devid);
+
+    size_t sizes[] = {
+        1ULL * 1024 * 1024,
+        64ULL * 1024 * 1024,
+        256ULL * 1024 * 1024,
+        1024ULL * 1024 * 1024,
+    };
+    const char* size_names[] = {"1MB", "64MB", "256MB", "1GB"};
+    int n_sizes = sizeof(sizes) / sizeof(sizes[0]);
+
+    for (int i = 0; i < n_sizes; i++) {
+        size_t sz = sizes[i];
+        void* host = nullptr;
+        void* dev = nullptr;
+
+        if (xpu_host_alloc(&host, sz, 0) != 0 || !host) {
+            printf("  %-5s  host_alloc failed\n", size_names[i]);
+            continue;
+        }
+        if (xpu_malloc(&dev, sz)) {
+            printf("  %-5s  dev malloc failed\n", size_names[i]);
+            xpu_host_free(host);
+            continue;
+        }
+        memset(host, 0xAB, sz);
+
+        for (int r = 0; r < WARMUP; r++) { xpu_memcpy(dev, host, sz, XPU_HOST_TO_DEVICE); xpu_wait(); }
+        double t0 = get_time_us();
+        for (int r = 0; r < RUNS; r++) { xpu_memcpy(dev, host, sz, XPU_HOST_TO_DEVICE); xpu_wait(); }
+        double t1 = get_time_us();
+        double h2d = (double)(sz * RUNS) / ((t1 - t0) * 1e-6) / (1.0 * 1024 * 1024 * 1024);
+
+        for (int r = 0; r < WARMUP; r++) { xpu_memcpy(host, dev, sz, XPU_DEVICE_TO_HOST); xpu_wait(); }
+        t0 = get_time_us();
+        for (int r = 0; r < RUNS; r++) { xpu_memcpy(host, dev, sz, XPU_DEVICE_TO_HOST); xpu_wait(); }
+        t1 = get_time_us();
+        double d2h = (double)(sz * RUNS) / ((t1 - t0) * 1e-6) / (1.0 * 1024 * 1024 * 1024);
+
+        printf("  %-5s  H2D: %6.2f GB/s   D2H: %6.2f GB/s\n", size_names[i], h2d, d2h);
+        xpu_free(dev);
+        xpu_host_free(host);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // 3. FP32 GEMM — with ncluster=4
@@ -227,7 +273,7 @@ void test_gemm_fp16(int devid) {
     }
     xpu_free(A); xpu_free(B); xpu_free(C);
 
-    // --- Part C: Pinned memory — SKIPPED (xpu_host_alloc unsupported in this SDK) ---
+    // --- Part C: host_alloc end-to-end (see test_bandwidth_pinned) ---
 }
 
 // ---------------------------------------------------------------------------
@@ -357,9 +403,12 @@ int main(int argc, char** argv) {
 
     if (argc > 2 && strcmp(argv[2], "sweep") == 0) {
         test_gemm_k_sweep(target_dev);
+    } else if (argc > 2 && strcmp(argv[2], "bw") == 0) {
+        test_bandwidth(target_dev);
+        test_bandwidth_pinned(target_dev);
     } else {
         test_bandwidth(target_dev);
-        //test_bandwidth_pinned(target_dev);
+        test_bandwidth_pinned(target_dev);
         test_gemm_fp32(target_dev);
         test_gemm_fp16(target_dev);
         test_gemm_int8(target_dev);

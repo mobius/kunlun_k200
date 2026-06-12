@@ -105,7 +105,7 @@
 | 阶段 | 目标 | 预期收益 |
 |:----:|------|----------|
 | S3 | INT8 性能探测 | 算子精度/吞吐（与本次驱动修复无关） |
-| S4 | Pinned DMA 直传 | `host_alloc` 内存零拷贝 EDMA，有望降低 H2D/D2H 延迟 |
+| S4 | Pinned DMA 直传 | **暂缓** — S2.4 证实 host_alloc 带宽无提升；见 `20260613-s2-host-alloc-bandwidth.md` |
 | （远期） | KL1 硬件 P2P / SSE-EDMA | 跨 PD 带宽从 ~2.5 GB/s 向 D2D 量级靠拢 |
 
 ---
