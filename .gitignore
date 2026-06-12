@@ -8,6 +8,7 @@ benchmarks/xpu_perf_test
 benchmarks/xpu_denoise
 tests/test_p2p
 tests/test_p2p_verify
+tests/test_host_alloc
 tests/test_bw
 tests/test_pinned
 tests/test_pinned2

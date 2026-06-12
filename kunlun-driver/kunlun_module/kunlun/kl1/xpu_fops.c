@@ -268,10 +268,18 @@ long xpu_char_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     return ret;
 }
 
-// mmap handler
+// mmap handler — pgoff=0 is xpu_host_alloc
 int xpu_char_mmap(struct file *file, struct vm_area_struct *vma)
 {
-    return 0;
+    struct xpu_session *sess = (struct xpu_session *)file->private_data;
+
+    if (!sess || !sess->xpd)
+        return -EINVAL;
+
+    if (vma->vm_pgoff == 0)
+        return kl1_mmap_host_alloc(sess->xpd, vma);
+
+    return -EINVAL;
 }
 
 struct file_operations xpu_fops = {
@@ -279,6 +287,7 @@ struct file_operations xpu_fops = {
     .open           = xpu_char_open,
     .release        = xpu_char_release,
     .unlocked_ioctl = xpu_char_ioctl,
+    .mmap           = xpu_char_mmap,
 #ifdef CONFIG_COMPAT
     .compat_ioctl = xpu_char_ioctl,
 #endif

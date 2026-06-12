@@ -16,6 +16,7 @@ KUNLUN_SOURCES += kunlun/kl1/control_node.c
 KUNLUN_SOURCES += kunlun/kl1/device.c
 KUNLUN_SOURCES += kunlun/kl1/device_state.c
 KUNLUN_SOURCES += kunlun/kl1/exception.c
+KUNLUN_SOURCES += kunlun/kl1/kl1_host_mem.c
 KUNLUN_SOURCES += kunlun/kl1/xpu_dma.c
 KUNLUN_SOURCES += kunlun/kl1/xpu_drv.c
 KUNLUN_SOURCES += kunlun/kl1/xpu_fops.c

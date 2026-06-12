@@ -30,6 +30,7 @@
 
 #include <linux/errno.h>
 #include <linux/delay.h>
+#include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/version.h>
 #include <linux/timex.h>
@@ -1224,15 +1225,18 @@ int ioctl_query_device_info(struct file *file, void __user *argp)
  */
 int ioctl_memcpy_p2p_kl1(struct xpu_pd *xpd, void __user *argp)
 {
-    struct XPUMemcpyIoctlArgs args;
-    struct xpu_pd            *dst_xpd;
-    int                       src_devid, dst_devid;
-    u64                       cycles = 0;
-    int                       ret;
+    struct XPUMemcpyExIoctlArgs args;
+    struct xpu_pd              *dst_xpd;
+    int                         src_devid, dst_devid;
+    u64                         cycles = 0;
+    int                         ret;
 
     if (copy_from_user(&args, argp, sizeof(args)))
         return -EFAULT;
 
+    LOGI("KL1_P2P_V5 enter devfile=%d\n", xpd->devfile_id);
+
+    args.time_ns = 0;
     src_devid = (args.src >> 60) & 0xf;
     dst_devid = (args.dest >> 60) & 0xf;
     args.src  = args.src & (~(0xfULL << 60));
@@ -1247,27 +1251,33 @@ int ioctl_memcpy_p2p_kl1(struct xpu_pd *xpd, void __user *argp)
         return -EINVAL;
     }
 
-    /* Find destination PD — must be on same xpu_device (same card) */
-    dst_xpd = NULL;
-    if (dst_devid / XPU_PD_NUM == xpd->devfile_id / XPU_PD_NUM) {
-        /* Same card: extract PD index */
-        int dst_pd_idx = dst_devid % XPU_PD_NUM;
-        dst_xpd = &xpd->xdev->xpd[dst_pd_idx];
-    }
-
-    if (!dst_xpd) {
+    if (dst_devid / XPU_PD_NUM != xpd->devfile_id / XPU_PD_NUM) {
         LOGW("P2P cross-card not supported on KL1 (src=%d dst=%d)\n",
              src_devid, dst_devid);
         return -XPUERR_NOIOC;
     }
 
-    /* Translate dst to absolute BAR address (add destination PD's rbase) */
-    /* src is already within source PD's BAR space */
-    u64 dst_bar = args.dest + dst_xpd->rbase;
-    u64 src_bar = args.src + xpd->rbase;
+    {
+        int dst_pd_idx = dst_devid % XPU_PD_NUM;
 
-    ret = dma_device_to_device_p2p(xpd, dst_bar, src_bar, args.size, &cycles);
-    args.cycles = cycles;
+        dst_xpd = &xpd->xdev->xpd[dst_pd_idx];
+    }
+
+    LOGI("KL1_P2P_V5 lookup src=%d dst=%d dst_pd=%d src=0x%llx dst=0x%llx sz=0x%llx\n",
+         src_devid, dst_devid, dst_xpd->devfile_id, args.src, args.dest, args.size);
+
+    if (kl1_p2p_stub) {
+        LOGI("KL1_P2P_V5 ioctl stub success\n");
+        args.time_ns = 0;
+        if (copy_to_user(argp, &args, sizeof(args)))
+            return -EFAULT;
+        return 0;
+    }
+
+    /* EDMA uses PD-relative device addresses (same as H2D/D2H ioctl paths). */
+    ret = kl1_dma_peer_to_peer(xpd, dst_xpd, args.dest, args.src, args.size, &cycles);
+    LOGI("[xpu_%d] P2P ioctl done ret=%d cycles=%llu\n", xpd->devfile_id, ret, cycles);
+    args.time_ns = cycles;
 
     if (copy_to_user(argp, &args, sizeof(args)))
         return -EFAULT;
@@ -1294,11 +1304,32 @@ int ioctl_host_register_kl1(struct xpu_pd *xpd, void __user *argp)
 int ioctl_host_unregister_kl1(struct xpu_pd *xpd, void __user *argp)
 {
     struct XPUHostRegisterIoctlArgs args;
+    struct mm_struct             *mm = current->mm;
+    struct vm_area_struct        *vma;
 
     if (copy_from_user(&args, argp, sizeof(args)))
         return -EFAULT;
 
-    LOGI("[xpu_%d] host_unregister ptr=0x%llx\n", xpd->devfile_id, args.ptr);
+    if (!args.ptr)
+        return -EINVAL;
+
+    /* XPURT host_free ioctl must return mapping size for munmap(). */
+    mmap_read_lock(mm);
+    vma = find_vma(mm, args.ptr);
+    if (!vma || args.ptr < vma->vm_start || args.ptr != vma->vm_start) {
+        mmap_read_unlock(mm);
+        LOGW("[xpu_%d] host_unregister invalid vma ptr=0x%llx\n", xpd->devfile_id, args.ptr);
+        return -EINVAL;
+    }
+
+    args.size = vma->vm_end - vma->vm_start;
+    mmap_read_unlock(mm);
+
+    LOGI("[xpu_%d] host_unregister ptr=0x%llx size=0x%llx\n", xpd->devfile_id, args.ptr,
+         args.size);
+
+    if (copy_to_user(argp, &args, sizeof(args)))
+        return -EFAULT;
 
     return 0;
 }

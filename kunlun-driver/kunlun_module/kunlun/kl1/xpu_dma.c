@@ -23,6 +23,8 @@
 
 #define __FILENAME__ "xpu_dma.c"
 
+#include <linux/slab.h>
+#include <linux/string.h>
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
 #include "xpu_drv.h"
@@ -322,5 +324,172 @@ int dma_device_to_device_p2p(struct xpu_pd *src_xpd, u64 dst_addr, u64 src_addr,
     ret = xpuhw_ssedma_locked(&src_xpd->ssedma, dst_addr, src_addr, sz, cycles);
     mutex_unlock(&src_xpd->ssedma.lock);
 
+    return ret;
+}
+
+/* Kernel-buffer variants (no copy_from/to_user) for P2P staging. */
+static int dma_device_to_kbuf(struct xpu_pd *xpd, void *kbuf, u64 src, u64 cpsz, u64 *total_cycles)
+{
+    int              i = 0, ret = 0, ch = -1;
+    size_t           dmasz;
+    u64              cycles = 0;
+    struct xpu_edma *edma;
+
+    if (!total_cycles || !kbuf)
+        return -XPUERR_INVALID_PARAM;
+
+    LOGI("KL1_P2P_V5 D2H kbuf dev=%d src=0x%llx sz=0x%llx\n", xpd->devfile_id, src, cpsz);
+
+    if (down_timeout(&xpd->wrch_sema, 5 * HZ)) {
+        LOGW("KL1_P2P_V5 wrch_sema timeout dev=%d\n", xpd->devfile_id);
+        return -EBUSY;
+    }
+
+    ch = get_wrch(xpd);
+    if (ch < 0) {
+        ret = -EFAULT;
+        goto err_out;
+    }
+
+    edma          = &xpd->wrch_edma[ch];
+    *total_cycles = 0;
+
+    while (cpsz) {
+        dmasz = (cpsz < KL1_DMA_KBUF_SIZE) ? cpsz : KL1_DMA_KBUF_SIZE;
+
+        mutex_lock(&edma->lock);
+        ret = xpuhw_edma_write_locked(edma, (u64)edma->dmabuf, src + (u64)KL1_DMA_KBUF_SIZE * i,
+                                      dmasz, &cycles);
+        mutex_unlock(&edma->lock);
+        if (ret) {
+            LOGW("KL1_P2P_V5 D2H edma ret=%d dev=%d\n", ret, xpd->devfile_id);
+            break;
+        }
+
+        *total_cycles += cycles;
+        memcpy((char *)kbuf + (u64)KL1_DMA_KBUF_SIZE * i, edma->kbuf, dmasz);
+        cpsz -= dmasz;
+        ++i;
+    }
+
+    put_wrch(xpd, ch);
+err_out:
+    up(&xpd->wrch_sema);
+    return ret;
+}
+
+static int dma_kbuf_to_device(struct xpu_pd *xpd, u64 dst, void *kbuf, u64 cpsz, u64 *total_cycles)
+{
+    int              i = 0, ret = 0, ch = -1;
+    size_t           dmasz;
+    u64              cycles = 0;
+    struct xpu_edma *edma;
+
+    if (!total_cycles || !kbuf)
+        return -XPUERR_INVALID_PARAM;
+
+    LOGI("KL1_P2P_V5 H2D kbuf dev=%d dst=0x%llx sz=0x%llx\n", xpd->devfile_id, dst, cpsz);
+
+    if (down_timeout(&xpd->rdch_sema, 5 * HZ)) {
+        LOGW("KL1_P2P_V5 rdch_sema timeout dev=%d\n", xpd->devfile_id);
+        return -EBUSY;
+    }
+
+    ch = get_rdch(xpd);
+    if (ch < 0) {
+        ret = -EFAULT;
+        goto err_out;
+    }
+
+    edma          = &xpd->rdch_edma[ch];
+    *total_cycles = 0;
+
+    while (cpsz) {
+        dmasz = (cpsz < KL1_DMA_KBUF_SIZE) ? cpsz : KL1_DMA_KBUF_SIZE;
+
+        memcpy(edma->kbuf, (char *)kbuf + (u64)KL1_DMA_KBUF_SIZE * i, dmasz);
+
+        mutex_lock(&edma->lock);
+        ret = xpuhw_edma_read_locked(edma, dst + (u64)KL1_DMA_KBUF_SIZE * i, (u64)edma->dmabuf,
+                                     dmasz, &cycles);
+        mutex_unlock(&edma->lock);
+        if (ret) {
+            LOGW("KL1_P2P_V5 H2D edma ret=%d dev=%d\n", ret, xpd->devfile_id);
+            break;
+        }
+
+        *total_cycles += cycles;
+        cpsz -= dmasz;
+        ++i;
+    }
+
+    put_rdch(xpd, ch);
+err_out:
+    up(&xpd->rdch_sema);
+    return ret;
+}
+
+/*!
+ * kl1_dma_peer_to_peer - P2P via host-staging (sequential D2H then H2D)
+ *
+ * Uses a kvmalloc bounce buffer; avoids vm_mmap (hangs when called from ioctl).
+ */
+int kl1_dma_peer_to_peer(struct xpu_pd *src_xpd, struct xpu_pd *dst_xpd, u64 dst_addr, u64 src_addr,
+                         u64 sz, u64 *cycles)
+{
+    void  *staging = NULL;
+    u64    cpsz = sz, total_cycles = 0, chunk_cycles = 0;
+    size_t dmasz;
+    int    ret = 0;
+
+    if (!cycles || !src_xpd || !dst_xpd || !sz)
+        return -XPUERR_INVALID_PARAM;
+
+    if (src_xpd->devfile_id == dst_xpd->devfile_id)
+        return -EINVAL;
+
+    if (kl1_p2p_stub) {
+        LOGI("KL1_P2P_V5 stub success\n");
+        *cycles = 0;
+        return 0;
+    }
+
+    LOGI("KL1_P2P_V5 kbuf enter src_pd=%d dst_pd=%d sz=0x%llx\n", src_xpd->devfile_id,
+         dst_xpd->devfile_id, sz);
+
+    staging = kvmalloc(sz, GFP_KERNEL);
+    if (!staging) {
+        LOGW("KL1_P2P_V5 kvmalloc failed sz=0x%llx\n", sz);
+        return -ENOMEM;
+    }
+
+    LOGI("KL1_P2P_V5 staging=%px sz=0x%llx\n", staging, sz);
+
+    while (cpsz) {
+        dmasz = (cpsz < KL1_DMA_KBUF_SIZE) ? cpsz : KL1_DMA_KBUF_SIZE;
+
+        ret = dma_device_to_kbuf(src_xpd, staging, src_addr, dmasz, &chunk_cycles);
+        LOGI("[xpu_%d] p2p D2H chunk ret=%d cycles=%llu\n", src_xpd->devfile_id, ret,
+             chunk_cycles);
+        if (ret)
+            break;
+        total_cycles += chunk_cycles;
+
+        cond_resched();
+
+        ret = dma_kbuf_to_device(dst_xpd, dst_addr, staging, dmasz, &chunk_cycles);
+        LOGI("[xpu_%d] p2p H2D chunk ret=%d cycles=%llu\n", dst_xpd->devfile_id, ret,
+             chunk_cycles);
+        if (ret)
+            break;
+        total_cycles += chunk_cycles;
+
+        src_addr += dmasz;
+        dst_addr += dmasz;
+        cpsz -= dmasz;
+    }
+
+    *cycles = total_cycles;
+    kvfree(staging);
     return ret;
 }

@@ -1,22 +1,40 @@
+ROOT = /mnt/storage/test_xpu
 CXX = g++
-CXXFLAGS = -std=c++17 -O2 -I/usr/local/xpu-4.33.0/include -I/mnt/storage/test_xpu/xdnn-ubuntu_x86_64/include
-LDFLAGS = -L/usr/local/xpu-4.33.0/lib64 -L/mnt/storage/test_xpu/xdnn-ubuntu_x86_64/so -lxpuapi -lxpurt -Wl,-rpath,/usr/local/xpu-4.33.0/lib64 -Wl,-rpath,/mnt/storage/test_xpu/xdnn-ubuntu_x86_64/so
+CXXFLAGS = -std=c++17 -O2 -I/usr/local/xpu-4.33.0/include -I$(ROOT)/xdnn-ubuntu_x86_64/include
+LDFLAGS = -L/usr/local/xpu-4.33.0/lib64 -L$(ROOT)/xdnn-ubuntu_x86_64/so -lxpuapi -lxpurt \
+          -Wl,-rpath,/usr/local/xpu-4.33.0/lib64 -Wl,-rpath,$(ROOT)/xdnn-ubuntu_x86_64/so
 
-TARGET = xpu_perf_test
-DENOISE = xpu_denoise
+BENCHMARKS = benchmarks/xpu_perf_test benchmarks/xpu_denoise
+TESTS = tests/test_p2p tests/test_p2p_verify tests/test_host_alloc
 
-all: $(TARGET) $(DENOISE)
+all: $(BENCHMARKS) $(TESTS)
 
-$(TARGET): xpu_perf_test.cpp
+benchmarks/xpu_perf_test: benchmarks/xpu_perf_test.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
 
-$(DENOISE): xpu_denoise.cpp
+benchmarks/xpu_denoise: benchmarks/xpu_denoise.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+
+tests/test_p2p: tests/test_p2p.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+
+tests/test_p2p_verify: tests/test_p2p_verify.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+
+tests/test_host_alloc: tests/test_host_alloc.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+
+driver:
+	$(MAKE) -C kunlun-driver modules
+
+driver-install: driver
+	sudo KL1_P2P_STUB=$${KL1_P2P_STUB:-0} scripts/install_driver.sh
 
 clean:
-	rm -f $(TARGET) $(DENOISE)
+	rm -f $(BENCHMARKS) $(TESTS)
+	$(MAKE) -C kunlun-driver clean 2>/dev/null || true
 
-run: $(TARGET)
-	./$(TARGET) 0
+run: benchmarks/xpu_perf_test
+	./benchmarks/xpu_perf_test 0
 
-.PHONY: all clean run
+.PHONY: all clean run driver driver-install

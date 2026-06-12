@@ -670,6 +670,10 @@ static void __exit kl_exit(void)
 }
 module_exit(kl_exit);
 
+int kl1_p2p_stub;
+module_param(kl1_p2p_stub, int, 0644);
+MODULE_PARM_DESC(kl1_p2p_stub, "KL1 P2P stub mode (1=instant success, debug only)");
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("BAIDU-ISA");
 MODULE_DESCRIPTION("kunlun");
