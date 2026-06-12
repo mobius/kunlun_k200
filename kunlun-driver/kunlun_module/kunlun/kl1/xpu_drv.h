@@ -740,9 +740,11 @@ int  kl1_dma_peer_to_peer(struct xpu_pd *src_xpd, struct xpu_pd *dst_xpd, u64 ds
 extern int kl1_p2p_stub;
 extern int kl1_dma_direct;
 int  kl1_mmap_host_alloc(struct xpu_pd *xpd, struct vm_area_struct *vma);
-bool kl1_user_range_is_host_alloc(struct mm_struct *mm, unsigned long uaddr, unsigned long len);
+bool kl1_user_range_is_host_alloc(struct mm_struct *mm, unsigned long uaddr, u64 len);
 int  kl1_host_alloc_get_page(struct mm_struct *mm, unsigned long uaddr, struct page **page_out,
                              unsigned int *offset_out);
+int  kl1_host_alloc_get_span(struct mm_struct *mm, unsigned long uaddr, struct page **page_out,
+                             unsigned int *offset_out, size_t *span_out);
 
 // Get xpd by xxx
 struct xpu_pd *get_xpd_by_devfile_id(int dst_dev);

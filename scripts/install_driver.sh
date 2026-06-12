@@ -75,7 +75,11 @@ echo "Installed ${KO_SRC} -> ${KO_DST}"
 depmod -a
 MODARGS=()
 [[ "${KL1_P2P_STUB:-0}" == "1" ]] && MODARGS+=(kl1_p2p_stub=1)
-[[ "${KL1_DMA_DIRECT:-0}" == "1" ]] && MODARGS+=(kl1_dma_direct=1)
+if [[ "${KL1_DMA_DIRECT:-1}" == "1" ]]; then
+    MODARGS+=(kl1_dma_direct=1)
+else
+    MODARGS+=(kl1_dma_direct=0)
+fi
 
 if [[ ${#MODARGS[@]} -gt 0 ]]; then
     modprobe kunlun "${MODARGS[@]}"
@@ -92,5 +96,6 @@ for param in kl1_p2p_stub kl1_dma_direct; do
     if [[ ! -f /sys/module/kunlun/parameters/${param} ]]; then
         die "${param} sysfs missing — loaded module does not match ${KO_SRC}. Reboot and rerun."
     fi
+    chmod 666 "/sys/module/kunlun/parameters/${param}" 2>/dev/null || true
     echo "${param}=$(cat /sys/module/kunlun/parameters/${param})"
 done

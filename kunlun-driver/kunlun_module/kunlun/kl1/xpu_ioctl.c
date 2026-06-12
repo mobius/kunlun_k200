@@ -773,6 +773,18 @@ int ioctl_prof_clear(struct file *file, struct xpu_pd *xpd, void __user *argp)
 // Put whatever you wanna test of the driver into this ioctl
 int ioctl_test(struct file *file, struct xpu_device *dev, void __user *argp)
 {
+    u64 data = (u64)(uintptr_t)argp;
+    int type = (int)(data & 0xff);
+
+    switch (type) {
+    case 5:
+        kl1_dma_direct = (int)((data >> 8) & 1);
+        LOGI("S4: kl1_dma_direct=%d (IOCTL_TEST)\n", kl1_dma_direct);
+        break;
+    default:
+        break;
+    }
+
 #if 0
     u64 data = (u64) argp;
     int type = data & 0xff;
@@ -1295,9 +1307,8 @@ int ioctl_host_register_kl1(struct xpu_pd *xpd, void __user *argp)
     LOGI("[xpu_%d] host_register ptr=0x%llx size=0x%llx (KL1 stub, returning 0)\n",
          xpd->devfile_id, args.ptr, args.size);
 
-    /* KL1 DMA always goes through copy_from_user/to_user bounce buffer.
-     * No actual page pinning needed. Return success so the library
-     * considers this memory "fast path" registered. */
+    /* KL1 host_alloc uses hugepage mmap + optional S4 direct EDMA.
+     * No extra pinning; return success for XPURT registration. */
     return 0;
 }
 

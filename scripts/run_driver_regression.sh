@@ -27,6 +27,14 @@ else
     echo "WARN: kl1_p2p_stub sysfs missing — old driver?"
 fi
 
+if [[ -f /sys/module/kunlun/parameters/kl1_dma_direct ]]; then
+    direct="$(cat /sys/module/kunlun/parameters/kl1_dma_direct)"
+    echo "kl1_dma_direct=$direct (expect 1 for S4 production)"
+    [[ "$direct" == "1" ]] || echo "WARN: S4 direct EDMA disabled — host_alloc uses bounce"
+else
+    echo "WARN: kl1_dma_direct sysfs missing — pre-S4 driver?"
+fi
+
 echo ""
 echo "--- Build tests ---"
 make tests/test_p2p_verify tests/test_host_alloc benchmarks/xpu_perf_test
@@ -45,11 +53,21 @@ grep -q 'xpu_host_free ret=0' /tmp/regression_host_alloc.log || fail "host_free"
 pass "host_alloc + host_free"
 
 echo ""
-echo "--- S2.4: bandwidth (pageable + host_alloc) ---"
-timeout 180 ./benchmarks/xpu_perf_test 0 bw | tee /tmp/regression_bw.log
+echo "--- S2.4 / S4: bandwidth (pageable + host_alloc) ---"
+timeout 300 ./benchmarks/xpu_perf_test 0 bw | tee /tmp/regression_bw.log
 grep -q 'PAGEABLE Memory' /tmp/regression_bw.log || fail "pageable bw section"
 grep -q 'xpu_host_alloc' /tmp/regression_bw.log || fail "host_alloc bw section"
-pass "bandwidth baseline"
+
+if [[ "${direct:-0}" == "1" ]]; then
+    h2d_64="$(grep '64MB' /tmp/regression_bw.log | tail -1 | sed -n 's/.*H2D:[[:space:]]*\([0-9.]*\).*/\1/p')"
+    if [[ -n "$h2d_64" ]] && awk "BEGIN {exit !($h2d_64 >= 8.0)}"; then
+        pass "S4 host_alloc 64MB H2D ${h2d_64} GB/s (direct)"
+    else
+        echo "WARN: S4 direct enabled but 64MB H2D=${h2d_64:-?} GB/s (expect >= 8)"
+    fi
+else
+    pass "bandwidth baseline (bounce)"
+fi
 
 echo ""
 echo "========================================"

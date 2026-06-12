@@ -15,7 +15,7 @@
 | S1 | P2P host-staging 驱动实现 | 1–2 天 | S0 | **已完成** → `docs/impl/20260612-s1-p2p-fix-and-s2-mmap.md` |
 | S2 | xpu_host_alloc mmap 实现 | 1–2 天 | S0 | **已完成** → 同上；**S2.4 带宽** → `docs/impl/20260613-s2-host-alloc-bandwidth.md` |
 | S3 | INT8 性能探测 | 0.5–1 天 | S0 | **已完成（不可用）** → `docs/impl/20260613-s3-int8-probe-results.md` |
-| S4 | Pinned DMA 直传（可选） | 2–3 天 | S2 完成且验证有收益 |
+| S4 | Pinned DMA 直传 | 2–3 天 | S2 完成 | **已完成** → `docs/impl/20260613-s4-pinned-dma.md` |
 
 每阶段产出 `docs/impl/YYYYMMDD-<phase>-results.md`。
 

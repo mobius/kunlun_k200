@@ -31,7 +31,7 @@ driver:
 	$(MAKE) -C kunlun-driver modules
 
 driver-install: driver
-	sudo KL1_P2P_STUB=$${KL1_P2P_STUB:-0} scripts/install_driver.sh
+	sudo KL1_P2P_STUB=$${KL1_P2P_STUB:-0} KL1_DMA_DIRECT=$${KL1_DMA_DIRECT:-1} scripts/install_driver.sh
 
 clean:
 	rm -f $(BENCHMARKS) $(TESTS)

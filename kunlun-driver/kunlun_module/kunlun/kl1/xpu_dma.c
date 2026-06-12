@@ -164,7 +164,7 @@ static inline void put_channel(spinlock_t *lock, unsigned long *bitmap, int ch)
 #define put_rdch(xpd, ch) put_channel(&((xpd)->rdch_bitmap_lock), &((xpd)->rdch_bitmap), (ch))
 #define put_wrch(xpd, ch) put_channel(&((xpd)->wrch_bitmap_lock), &((xpd)->wrch_bitmap), (ch))
 
-/* S4 spike: EDMA directly to/from dma_map_page(host_alloc page), skip bounce copy. */
+/* S4: EDMA directly to/from dma_map_page(host_alloc hugepage), skip bounce copy. */
 static int kl1_edma_h2d_page(struct xpu_edma *edma, u64 dst_dev, struct page *page,
                              unsigned int offset, size_t len, u64 *cycles)
 {
@@ -214,7 +214,7 @@ static int dma_host_to_device_direct(struct xpu_pd *xpd, u64 dst, unsigned long 
     if (!mm || !total_cycles)
         return -XPUERR_INVALID_PARAM;
 
-    if (down_timeout(&xpd->rdch_sema, 5 * HZ)) {
+    if (down_timeout(&xpd->rdch_sema, 60 * HZ)) {
         LOGW("[xpu_%d] S4 H2D rdch_sema timeout\n", xpd->devfile_id);
         return -XPUERR_TIMEOUT;
     }
@@ -227,19 +227,19 @@ static int dma_host_to_device_direct(struct xpu_pd *xpd, u64 dst, unsigned long 
 
     edma          = &xpd->rdch_edma[ch];
     *total_cycles = 0;
-    LOGI("[xpu_%d] S4 H2D direct src=0x%lx sz=0x%llx\n", xpd->devfile_id, src_u, cpsz);
+    LOGL2("[xpu_%d] S4 H2D direct src=0x%lx sz=0x%llx\n", xpd->devfile_id, src_u, cpsz);
 
     while (done < cpsz) {
         struct page   *page;
         unsigned int   pgoff;
-        size_t         run = min_t(size_t, cpsz - done, KL1_DMA_KBUF_SIZE);
+        size_t         span, run = min_t(size_t, cpsz - done, KL1_DMA_KBUF_SIZE);
         size_t         seg;
 
-        ret = kl1_host_alloc_get_page(mm, src_u + done, &page, &pgoff);
+        ret = kl1_host_alloc_get_span(mm, src_u + done, &page, &pgoff, &span);
         if (ret)
             break;
 
-        seg = min(run, (size_t)PAGE_SIZE - pgoff);
+        seg = min(run, span);
         ret = kl1_edma_h2d_page(edma, dst + done, page, pgoff, seg, &cycles);
         put_page(page);
         if (ret)
@@ -266,7 +266,7 @@ static int dma_device_to_host_direct(struct xpu_pd *xpd, unsigned long dst_u, u6
     if (!mm || !total_cycles)
         return -XPUERR_INVALID_PARAM;
 
-    if (down_timeout(&xpd->wrch_sema, 5 * HZ)) {
+    if (down_timeout(&xpd->wrch_sema, 60 * HZ)) {
         LOGW("[xpu_%d] S4 D2H wrch_sema timeout\n", xpd->devfile_id);
         return -XPUERR_TIMEOUT;
     }
@@ -279,19 +279,19 @@ static int dma_device_to_host_direct(struct xpu_pd *xpd, unsigned long dst_u, u6
 
     edma          = &xpd->wrch_edma[ch];
     *total_cycles = 0;
-    LOGI("[xpu_%d] S4 D2H direct dst=0x%lx sz=0x%llx\n", xpd->devfile_id, dst_u, cpsz);
+    LOGL2("[xpu_%d] S4 D2H direct dst=0x%lx sz=0x%llx\n", xpd->devfile_id, dst_u, cpsz);
 
     while (done < cpsz) {
         struct page   *page;
         unsigned int   pgoff;
-        size_t         run = min_t(size_t, cpsz - done, KL1_DMA_KBUF_SIZE);
+        size_t         span, run = min_t(size_t, cpsz - done, KL1_DMA_KBUF_SIZE);
         size_t         seg;
 
-        ret = kl1_host_alloc_get_page(mm, dst_u + done, &page, &pgoff);
+        ret = kl1_host_alloc_get_span(mm, dst_u + done, &page, &pgoff, &span);
         if (ret)
             break;
 
-        seg = min(run, (size_t)PAGE_SIZE - pgoff);
+        seg = min(run, span);
         ret = kl1_edma_d2h_page(edma, src + done, page, pgoff, seg, &cycles);
         put_page(page);
         if (ret)
