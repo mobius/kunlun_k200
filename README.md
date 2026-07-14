@@ -13,7 +13,7 @@
 | Host | Gigabyte G292-Z20, 2× AMD EPYC 7K62 |
 | Kernel | 6.8.0-124-generic, GCC 12.3.0 |
 
-## Key Benchmarks (post driver fix, 2026-06)
+## Key Benchmarks (post S5, 2026-07-14)
 
 ### Compute (xdnn GEMM)
 
@@ -27,14 +27,16 @@
 
 | Direction | BW | Notes |
 |-----------|:----:|-------|
-| H2D | ~5.5 GB/s | pageable and `xpu_host_alloc` — same path |
-| D2H | ~4.9 GB/s | KL1 uses bounce-buffer DMA |
+| H2D pageable | ~5.5 GB/s | bounce-buffer DMA |
+| D2H pageable | ~4.9 GB/s | bounce-buffer DMA |
+| H2D `xpu_host_alloc` (S4) | **~12.5 GB/s** | direct EDMA, `kl1_dma_direct=1` |
+| D2H `xpu_host_alloc` (S4) | **~12.9 GB/s** | ≤256MB; 1GB may fall back if hugepages exhausted |
 
 ### P2P (same card, PD0 → PD1)
 
 | Metric | Value | Notes |
 |--------|:-----:|-------|
-| Bandwidth | ~2.5 GB/s | kvmalloc staging (D2H → H2D) |
+| Bandwidth (S5) | **~11.2 GB/s** | zero-copy + ping-pong (was ~2.5) |
 | Data verify | PASS | `tests/test_p2p_verify` |
 
 ### Latency
@@ -53,23 +55,24 @@
 
 ## Driver fixes (KL1 / K200)
 
-| Feature | Before | After |
-|---------|--------|-------|
-| `xpu_memcpy_peer` | ioctl hang | PASS, ~2.5 GB/s |
-| `xpu_host_alloc` | -706 | PASS (64MB mmap) |
-| `xpu_host_free` | -707 | PASS |
-| H2D/D2H via host_alloc | N/A | No bandwidth gain vs pageable |
+| Feature | Before | After (S5) |
+|---------|--------|------------|
+| `xpu_memcpy_peer` (same card) | hang / ~2.5 GB/s fallback | **~11.2 GB/s**, verify PASS |
+| `xpu_host_alloc` / `host_free` | -706 / -707 | PASS (2MB hugepage mmap) |
+| H2D/D2H via host_alloc | bounce only | **~12.5 / 12.9 GB/s** (S4 direct) |
 
 Install modified driver:
 
 ```bash
 make driver
-sudo KL1_P2P_STUB=0 scripts/install_driver.sh
+sudo KL1_P2P_STUB=0 KL1_DMA_DIRECT=1 scripts/install_driver.sh
+# or: make driver-install
 ```
 
-Debug P2P ioctl hangs only: `sudo modprobe kunlun kl1_p2p_stub=1` or `echo 1 > /sys/module/kunlun/parameters/kl1_p2p_stub`.
+Debug: `echo 1 > /sys/module/kunlun/parameters/kl1_p2p_stub`  
+Disable S4: `echo 0 > /sys/module/kunlun/parameters/kl1_dma_direct`
 
-Detailed write-ups: `docs/impl/`, `docs/plan/20260612-remediation-iteration-plan.md`.
+Detailed write-ups: `docs/impl/20260714-s5-p2p-pingpong.md`, `docs/plan/20260612-remediation-iteration-plan.md`.
 
 ## Project Structure
 
@@ -131,4 +134,4 @@ python3 scripts/paddle_infer_benchmark.py --model paddle_models --batch_size 1
 - PCIe ×16
 - Hardware cross-card P2P
 - INT8 GEMM without firmware update
-- Pinned DMA zero-copy (S4 deferred — no bandwidth gain observed in S2.4)
+- Hardware cross-card P2P / BAR IOVA

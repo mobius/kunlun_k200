@@ -232,7 +232,8 @@ static int dma_host_to_device_direct(struct xpu_pd *xpd, u64 dst, unsigned long 
     while (done < cpsz) {
         struct page   *page;
         unsigned int   pgoff;
-        size_t         span, run = min_t(size_t, cpsz - done, KL1_DMA_KBUF_SIZE);
+        /* S5: direct path may span full hugepage (≤2MB); no bounce kbuf cap. */
+        size_t         span, run = min_t(size_t, cpsz - done, 2 * 1024 * 1024UL);
         size_t         seg;
 
         ret = kl1_host_alloc_get_span(mm, src_u + done, &page, &pgoff, &span);
@@ -284,7 +285,7 @@ static int dma_device_to_host_direct(struct xpu_pd *xpd, unsigned long dst_u, u6
     while (done < cpsz) {
         struct page   *page;
         unsigned int   pgoff;
-        size_t         span, run = min_t(size_t, cpsz - done, KL1_DMA_KBUF_SIZE);
+        size_t         span, run = min_t(size_t, cpsz - done, 2 * 1024 * 1024UL);
         size_t         seg;
 
         ret = kl1_host_alloc_get_span(mm, dst_u + done, &page, &pgoff, &span);
@@ -480,120 +481,28 @@ int dma_device_to_device_p2p(struct xpu_pd *src_xpd, u64 dst_addr, u64 src_addr,
     return ret;
 }
 
-/* Kernel-buffer variants (no copy_from/to_user) for P2P staging. */
-static int dma_device_to_kbuf(struct xpu_pd *xpd, void *kbuf, u64 src, u64 cpsz, u64 *total_cycles)
-{
-    int              i = 0, ret = 0, ch = -1;
-    size_t           dmasz;
-    u64              cycles = 0;
-    struct xpu_edma *edma;
-
-    if (!total_cycles || !kbuf)
-        return -XPUERR_INVALID_PARAM;
-
-    LOGI("KL1_P2P_V5 D2H kbuf dev=%d src=0x%llx sz=0x%llx\n", xpd->devfile_id, src, cpsz);
-
-    if (down_timeout(&xpd->wrch_sema, 5 * HZ)) {
-        LOGW("KL1_P2P_V5 wrch_sema timeout dev=%d\n", xpd->devfile_id);
-        return -EBUSY;
-    }
-
-    ch = get_wrch(xpd);
-    if (ch < 0) {
-        ret = -EFAULT;
-        goto err_out;
-    }
-
-    edma          = &xpd->wrch_edma[ch];
-    *total_cycles = 0;
-
-    while (cpsz) {
-        dmasz = (cpsz < KL1_DMA_KBUF_SIZE) ? cpsz : KL1_DMA_KBUF_SIZE;
-
-        mutex_lock(&edma->lock);
-        ret = xpuhw_edma_write_locked(edma, (u64)edma->dmabuf, src + (u64)KL1_DMA_KBUF_SIZE * i,
-                                      dmasz, &cycles);
-        mutex_unlock(&edma->lock);
-        if (ret) {
-            LOGW("KL1_P2P_V5 D2H edma ret=%d dev=%d\n", ret, xpd->devfile_id);
-            break;
-        }
-
-        *total_cycles += cycles;
-        memcpy((char *)kbuf + (u64)KL1_DMA_KBUF_SIZE * i, edma->kbuf, dmasz);
-        cpsz -= dmasz;
-        ++i;
-    }
-
-    put_wrch(xpd, ch);
-err_out:
-    up(&xpd->wrch_sema);
-    return ret;
-}
-
-static int dma_kbuf_to_device(struct xpu_pd *xpd, u64 dst, void *kbuf, u64 cpsz, u64 *total_cycles)
-{
-    int              i = 0, ret = 0, ch = -1;
-    size_t           dmasz;
-    u64              cycles = 0;
-    struct xpu_edma *edma;
-
-    if (!total_cycles || !kbuf)
-        return -XPUERR_INVALID_PARAM;
-
-    LOGI("KL1_P2P_V5 H2D kbuf dev=%d dst=0x%llx sz=0x%llx\n", xpd->devfile_id, dst, cpsz);
-
-    if (down_timeout(&xpd->rdch_sema, 5 * HZ)) {
-        LOGW("KL1_P2P_V5 rdch_sema timeout dev=%d\n", xpd->devfile_id);
-        return -EBUSY;
-    }
-
-    ch = get_rdch(xpd);
-    if (ch < 0) {
-        ret = -EFAULT;
-        goto err_out;
-    }
-
-    edma          = &xpd->rdch_edma[ch];
-    *total_cycles = 0;
-
-    while (cpsz) {
-        dmasz = (cpsz < KL1_DMA_KBUF_SIZE) ? cpsz : KL1_DMA_KBUF_SIZE;
-
-        memcpy(edma->kbuf, (char *)kbuf + (u64)KL1_DMA_KBUF_SIZE * i, dmasz);
-
-        mutex_lock(&edma->lock);
-        ret = xpuhw_edma_read_locked(edma, dst + (u64)KL1_DMA_KBUF_SIZE * i, (u64)edma->dmabuf,
-                                     dmasz, &cycles);
-        mutex_unlock(&edma->lock);
-        if (ret) {
-            LOGW("KL1_P2P_V5 H2D edma ret=%d dev=%d\n", ret, xpd->devfile_id);
-            break;
-        }
-
-        *total_cycles += cycles;
-        cpsz -= dmasz;
-        ++i;
-    }
-
-    put_rdch(xpd, ch);
-err_out:
-    up(&xpd->rdch_sema);
-    return ret;
-}
-
 /*!
- * kl1_dma_peer_to_peer - P2P via host-staging (sequential D2H then H2D)
+ * kl1_dma_peer_to_peer - S5 same-card P2P via coherent EDMA staging + ping-pong
  *
- * Uses a kvmalloc bounce buffer; avoids vm_mmap (hangs when called from ioctl).
+ * Previous path: full-size kvmalloc + D2H(edma.kbuf)+memcpy + memcpy+H2D (sequential).
+ * New path (same physical card / shared PCIe DMA domain):
+ *   - Stage in existing dma_alloc_coherent kbufs (no full-size kvmalloc, no CPU memcpy)
+ *   - Dual-buffer ping-pong: overlap D2H of chunk N+1 with H2D of chunk N
+ *   - Different EDMA channels on PD0/PD1 run concurrently
  */
 int kl1_dma_peer_to_peer(struct xpu_pd *src_xpd, struct xpu_pd *dst_xpd, u64 dst_addr, u64 src_addr,
                          u64 sz, u64 *cycles)
 {
-    void  *staging = NULL;
-    u64    cpsz = sz, total_cycles = 0, chunk_cycles = 0;
-    size_t dmasz;
-    int    ret = 0;
+    struct xpu_edma *src_edma, *dst_edma;
+    struct xpu_edma *pp_edma[2];
+    dma_addr_t       pp_dma[2];
+    u64              total_cycles = 0, cyc = 0;
+    u64              remain, dmasz, prev_dmasz, src_off, dst_off;
+    int              src_ch = -1, dst_ch = -1, pp_ch = -1;
+    int              ret = 0, ping = 0, loop, i;
+    bool             got_src = false, got_dst = false, got_pp = false;
+    bool             d2h_inflight = false, h2d_inflight = false;
+    bool             src_first;
 
     if (!cycles || !src_xpd || !dst_xpd || !sz)
         return -XPUERR_INVALID_PARAM;
@@ -602,47 +511,233 @@ int kl1_dma_peer_to_peer(struct xpu_pd *src_xpd, struct xpu_pd *dst_xpd, u64 dst
         return -EINVAL;
 
     if (kl1_p2p_stub) {
-        LOGI("KL1_P2P_V5 stub success\n");
+        LOGL2("KL1_P2P_V6 stub success\n");
         *cycles = 0;
         return 0;
     }
 
-    LOGI("KL1_P2P_V5 kbuf enter src_pd=%d dst_pd=%d sz=0x%llx\n", src_xpd->devfile_id,
-         dst_xpd->devfile_id, sz);
-
-    staging = kvmalloc(sz, GFP_KERNEL);
-    if (!staging) {
-        LOGW("KL1_P2P_V5 kvmalloc failed sz=0x%llx\n", sz);
-        return -ENOMEM;
+    /* Same card only — cross-card has no BAR/IOVA mapping on KL1. */
+    if (src_xpd->xdev != dst_xpd->xdev) {
+        LOGW("KL1_P2P_V6 cross-device not supported src=%d dst=%d\n", src_xpd->devfile_id,
+             dst_xpd->devfile_id);
+        return -XPUERR_NOIOC;
     }
 
-    LOGI("KL1_P2P_V5 staging=%px sz=0x%llx\n", staging, sz);
+    LOGL2("KL1_P2P_V6 pingpong src_pd=%d dst_pd=%d sz=0x%llx\n", src_xpd->devfile_id,
+          dst_xpd->devfile_id, sz);
 
-    while (cpsz) {
-        dmasz = (cpsz < KL1_DMA_KBUF_SIZE) ? cpsz : KL1_DMA_KBUF_SIZE;
+    /*
+     * Resources: src.wrch (D2H, ×1 or ×2 for dual staging) + dst.rdch (H2D).
+     * Semaphore order follows ascending devfile_id so reverse concurrent P2P
+     * cannot deadlock.
+     */
+    src_first = src_xpd->devfile_id < dst_xpd->devfile_id;
 
-        ret = dma_device_to_kbuf(src_xpd, staging, src_addr, dmasz, &chunk_cycles);
-        LOGI("[xpu_%d] p2p D2H chunk ret=%d cycles=%llu\n", src_xpd->devfile_id, ret,
-             chunk_cycles);
-        if (ret)
-            break;
-        total_cycles += chunk_cycles;
-
-        cond_resched();
-
-        ret = dma_kbuf_to_device(dst_xpd, dst_addr, staging, dmasz, &chunk_cycles);
-        LOGI("[xpu_%d] p2p H2D chunk ret=%d cycles=%llu\n", dst_xpd->devfile_id, ret,
-             chunk_cycles);
-        if (ret)
-            break;
-        total_cycles += chunk_cycles;
-
-        src_addr += dmasz;
-        dst_addr += dmasz;
-        cpsz -= dmasz;
+    if (src_first) {
+        if (down_timeout(&src_xpd->wrch_sema, 10 * HZ)) {
+            LOGW("KL1_P2P_V6 wrch_sema timeout pd=%d\n", src_xpd->devfile_id);
+            return -EBUSY;
+        }
+        got_src = true;
+        /* Try second staging buffer (optional). */
+        if (down_trylock(&src_xpd->wrch_sema) == 0)
+            got_pp = true;
+        if (down_timeout(&dst_xpd->rdch_sema, 10 * HZ)) {
+            if (got_pp)
+                up(&src_xpd->wrch_sema);
+            up(&src_xpd->wrch_sema);
+            got_src = false;
+            got_pp  = false;
+            LOGW("KL1_P2P_V6 rdch_sema timeout pd=%d\n", dst_xpd->devfile_id);
+            return -EBUSY;
+        }
+        got_dst = true;
+    } else {
+        /* first is dst: take dst.rdch first, then src.wrch */
+        if (down_timeout(&dst_xpd->rdch_sema, 10 * HZ)) {
+            LOGW("KL1_P2P_V6 rdch_sema timeout pd=%d\n", dst_xpd->devfile_id);
+            return -EBUSY;
+        }
+        got_dst = true;
+        if (down_timeout(&src_xpd->wrch_sema, 10 * HZ)) {
+            up(&dst_xpd->rdch_sema);
+            got_dst = false;
+            LOGW("KL1_P2P_V6 wrch_sema timeout pd=%d\n", src_xpd->devfile_id);
+            return -EBUSY;
+        }
+        got_src = true;
+        if (down_trylock(&src_xpd->wrch_sema) == 0)
+            got_pp = true;
     }
+
+    src_ch = get_wrch(src_xpd);
+    if (src_ch < 0) {
+        ret = -EFAULT;
+        goto out_semas;
+    }
+    src_edma = &src_xpd->wrch_edma[src_ch];
+
+    dst_ch = get_rdch(dst_xpd);
+    if (dst_ch < 0) {
+        ret = -EFAULT;
+        goto out_put;
+    }
+    dst_edma = &dst_xpd->rdch_edma[dst_ch];
+
+    /* Second staging buffer: another write channel on src (same DMA domain). */
+    if (got_pp) {
+        pp_ch = get_wrch(src_xpd);
+        if (pp_ch < 0) {
+            up(&src_xpd->wrch_sema);
+            got_pp = false;
+            pp_edma[0] = src_edma;
+            pp_edma[1] = src_edma;
+            pp_dma[0]  = src_edma->dmabuf;
+            pp_dma[1]  = src_edma->dmabuf;
+        } else {
+            pp_edma[0] = src_edma;
+            pp_edma[1] = &src_xpd->wrch_edma[pp_ch];
+            pp_dma[0]  = src_edma->dmabuf;
+            pp_dma[1]  = pp_edma[1]->dmabuf;
+        }
+    } else {
+        /* Single-buffer fallback (still zero-copy, no CPU memcpy). */
+        pp_edma[0] = src_edma;
+        pp_edma[1] = src_edma;
+        pp_dma[0]  = src_edma->dmabuf;
+        pp_dma[1]  = src_edma->dmabuf;
+    }
+
+    if (!src_edma->enable || !dst_edma->enable || !pp_dma[0] || !pp_dma[1]) {
+        ret = -XPUERR_PEERRESET;
+        goto out_put;
+    }
+
+    loop    = (int)((sz + KL1_DMA_KBUF_SIZE - 1) / KL1_DMA_KBUF_SIZE);
+    remain  = sz;
+    src_off = src_addr;
+    dst_off = dst_addr;
+    ping    = 0;
+
+    mutex_lock(&src_edma->lock);
+    if (got_pp && pp_edma[1] != src_edma)
+        mutex_lock(&pp_edma[1]->lock);
+    mutex_lock(&dst_edma->lock);
+
+    /* Kick first D2H into buf0 */
+    dmasz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
+    ret   = xpuhw_edma_write_start(src_edma, (u64)pp_dma[0], src_off, dmasz);
+    if (ret)
+        goto out_unlock;
+    d2h_inflight = true;
+    prev_dmasz   = dmasz;
+    src_off += dmasz;
+    remain -= dmasz;
+
+    for (i = 1; i < loop; i++) {
+        /* Wait previous D2H, then overlap H2D(prev) with D2H(next). */
+        ret = xpuhw_edma_write_wait(src_edma, &cyc);
+        d2h_inflight = false;
+        if (ret)
+            goto out_unlock;
+        total_cycles += cyc;
+
+        ret = xpuhw_edma_read_start(dst_edma, dst_off, (u64)pp_dma[ping], prev_dmasz);
+        if (ret)
+            goto out_unlock;
+        h2d_inflight = true;
+        dst_off += prev_dmasz;
+
+        if (got_pp) {
+            ping ^= 1;
+            dmasz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
+            ret   = xpuhw_edma_write_start(src_edma, (u64)pp_dma[ping], src_off, dmasz);
+            if (ret)
+                goto out_unlock;
+            d2h_inflight = true;
+            prev_dmasz   = dmasz;
+            src_off += dmasz;
+            remain -= dmasz;
+
+            ret = xpuhw_edma_read_wait(dst_edma, &cyc);
+            h2d_inflight = false;
+            if (ret)
+                goto out_unlock;
+            total_cycles += cyc;
+        } else {
+            /* Single buffer: must finish H2D before next D2H. */
+            ret = xpuhw_edma_read_wait(dst_edma, &cyc);
+            h2d_inflight = false;
+            if (ret)
+                goto out_unlock;
+            total_cycles += cyc;
+
+            dmasz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
+            ret   = xpuhw_edma_write_start(src_edma, (u64)pp_dma[0], src_off, dmasz);
+            if (ret)
+                goto out_unlock;
+            d2h_inflight = true;
+            prev_dmasz   = dmasz;
+            src_off += dmasz;
+            remain -= dmasz;
+        }
+
+        if ((i & 0x3f) == 0)
+            cond_resched();
+    }
+
+    /* Drain last D2H then final H2D */
+    if (d2h_inflight) {
+        ret = xpuhw_edma_write_wait(src_edma, &cyc);
+        d2h_inflight = false;
+        if (ret)
+            goto out_unlock;
+        total_cycles += cyc;
+    }
+
+    ret = xpuhw_edma_read_start(dst_edma, dst_off, (u64)pp_dma[ping], prev_dmasz);
+    if (ret)
+        goto out_unlock;
+    ret = xpuhw_edma_read_wait(dst_edma, &cyc);
+    if (ret)
+        goto out_unlock;
+    total_cycles += cyc;
 
     *cycles = total_cycles;
-    kvfree(staging);
+    LOGL2("KL1_P2P_V6 done src=%d dst=%d sz=0x%llx cycles=%llu dual=%d\n", src_xpd->devfile_id,
+          dst_xpd->devfile_id, sz, total_cycles, got_pp ? 1 : 0);
+
+out_unlock:
+    if (ret) {
+        u64 discard = 0;
+
+        /* Best-effort drain so channel state is clean for later transfers. */
+        if (d2h_inflight)
+            (void)xpuhw_edma_write_wait(src_edma, &discard);
+        if (h2d_inflight)
+            (void)xpuhw_edma_read_wait(dst_edma, &discard);
+        LOGW("KL1_P2P_V6 fail ret=%d src=%d dst=%d\n", ret, src_xpd->devfile_id,
+             dst_xpd->devfile_id);
+    }
+    mutex_unlock(&dst_edma->lock);
+    if (got_pp && pp_edma[1] != src_edma)
+        mutex_unlock(&pp_edma[1]->lock);
+    mutex_unlock(&src_edma->lock);
+
+out_put:
+    if (got_pp && pp_ch >= 0)
+        put_wrch(src_xpd, pp_ch);
+    if (dst_ch >= 0)
+        put_rdch(dst_xpd, dst_ch);
+    if (src_ch >= 0)
+        put_wrch(src_xpd, src_ch);
+
+out_semas:
+    if (got_pp)
+        up(&src_xpd->wrch_sema);
+    if (got_src)
+        up(&src_xpd->wrch_sema);
+    if (got_dst)
+        up(&dst_xpd->rdch_sema);
     return ret;
 }

@@ -55,6 +55,11 @@ int  xpuhw_edma_init(struct xpu_device *);
 void xpuhw_edma_uninit(struct xpu_device *);
 int  xpuhw_edma_read_locked(struct xpu_edma *, u64 dst, u64 src, size_t sz, u64 *cycles);
 int  xpuhw_edma_write_locked(struct xpu_edma *, u64 dst, u64 src, size_t sz, u64 *cycles);
+/* S5: split start/wait so P2P can overlap D2H with H2D on different channels. */
+int  xpuhw_edma_read_start(struct xpu_edma *, u64 dst_dev, u64 src_host, size_t sz);
+int  xpuhw_edma_write_start(struct xpu_edma *, u64 dst_host, u64 src_dev, size_t sz);
+int  xpuhw_edma_read_wait(struct xpu_edma *, u64 *cycles);
+int  xpuhw_edma_write_wait(struct xpu_edma *, u64 *cycles);
 int  xpuhw_edma_rwl(struct xpu_device *xdev, u64 reg_addr, u32 value);
 int  xpuhw_edma_rrl(struct xpu_device *xdev, u64 reg_addr, u32 *value);
 

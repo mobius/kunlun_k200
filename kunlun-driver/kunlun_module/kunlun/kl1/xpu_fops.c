@@ -133,18 +133,22 @@ long xpu_char_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     if (ret)
         return ret;
 
-    /* Intercept P2P ioctls by command number (size may differ from header) */
-    if (_IOC_TYPE(cmd) == _IOC_TYPE(IOCTL_IOC_MAGIC)) {
-        if (_IOC_NR(cmd) == _IOC_NR(IOCTL_MEMCPY_P2P_DIRECT) ||
-            _IOC_NR(cmd) == _IOC_NR(IOCTL_MEMCPY_P2P)) {
+    /*
+     * Intercept P2P / host_register by NR only. Do NOT compare
+     * _IOC_TYPE(cmd) == _IOC_TYPE(IOCTL_IOC_MAGIC): MAGIC is 0x8EEDCE and
+     * _IOC_TYPE() of the bare magic is 0xED, while encoded cmds use type 0xCE.
+     * That mismatch made kernel P2P never run (userspace fell back to D2H+H2D).
+     * Also size bits in _IOWR may differ between XPURT and kernel headers.
+     */
+    {
+        unsigned int nr = _IOC_NR(cmd);
+
+        if (nr == _IOC_NR(IOCTL_MEMCPY_P2P_DIRECT) || nr == _IOC_NR(IOCTL_MEMCPY_P2P))
             return ioctl_memcpy_p2p_kl1(xpd, argp);
-        }
-        if (_IOC_NR(cmd) == _IOC_NR(IOCTL_HOST_REGISTER)) {
+        if (nr == _IOC_NR(IOCTL_HOST_REGISTER))
             return ioctl_host_register_kl1(xpd, argp);
-        }
-        if (_IOC_NR(cmd) == _IOC_NR(IOCTL_HOST_UNREGISTER)) {
+        if (nr == _IOC_NR(IOCTL_HOST_UNREGISTER))
             return ioctl_host_unregister_kl1(xpd, argp);
-        }
     }
 
     switch (cmd) {

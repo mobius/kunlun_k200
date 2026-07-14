@@ -16,6 +16,7 @@
 | S2 | xpu_host_alloc mmap 实现 | 1–2 天 | S0 | **已完成** → 同上；**S2.4 带宽** → `docs/impl/20260613-s2-host-alloc-bandwidth.md` |
 | S3 | INT8 性能探测 | 0.5–1 天 | S0 | **已完成（不可用）** → `docs/impl/20260613-s3-int8-probe-results.md` |
 | S4 | Pinned DMA 直传 | 2–3 天 | S2 完成 | **已完成** → `docs/impl/20260613-s4-pinned-dma.md` |
+| S5 | P2P 零拷贝 + ping-pong + ioctl 修复 | 1 天 | S1/S4 | **已完成** P2P ~11.2 GB/s → `docs/impl/20260714-s5-p2p-pingpong.md` |
 
 每阶段产出 `docs/impl/YYYYMMDD-<phase>-results.md`。
 

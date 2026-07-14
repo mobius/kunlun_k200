@@ -1246,7 +1246,7 @@ int ioctl_memcpy_p2p_kl1(struct xpu_pd *xpd, void __user *argp)
     if (copy_from_user(&args, argp, sizeof(args)))
         return -EFAULT;
 
-    LOGI("KL1_P2P_V5 enter devfile=%d\n", xpd->devfile_id);
+    LOGL2("KL1_P2P_V6 enter devfile=%d\n", xpd->devfile_id);
 
     args.time_ns = 0;
     src_devid = (args.src >> 60) & 0xf;
@@ -1275,11 +1275,11 @@ int ioctl_memcpy_p2p_kl1(struct xpu_pd *xpd, void __user *argp)
         dst_xpd = &xpd->xdev->xpd[dst_pd_idx];
     }
 
-    LOGI("KL1_P2P_V5 lookup src=%d dst=%d dst_pd=%d src=0x%llx dst=0x%llx sz=0x%llx\n",
-         src_devid, dst_devid, dst_xpd->devfile_id, args.src, args.dest, args.size);
+    LOGL2("KL1_P2P_V6 lookup src=%d dst=%d src=0x%llx dst=0x%llx sz=0x%llx\n", src_devid,
+          dst_devid, args.src, args.dest, args.size);
 
     if (kl1_p2p_stub) {
-        LOGI("KL1_P2P_V5 ioctl stub success\n");
+        LOGL2("KL1_P2P_V6 ioctl stub success\n");
         args.time_ns = 0;
         if (copy_to_user(argp, &args, sizeof(args)))
             return -EFAULT;
@@ -1288,7 +1288,7 @@ int ioctl_memcpy_p2p_kl1(struct xpu_pd *xpd, void __user *argp)
 
     /* EDMA uses PD-relative device addresses (same as H2D/D2H ioctl paths). */
     ret = kl1_dma_peer_to_peer(xpd, dst_xpd, args.dest, args.src, args.size, &cycles);
-    LOGI("[xpu_%d] P2P ioctl done ret=%d cycles=%llu\n", xpd->devfile_id, ret, cycles);
+    LOGL2("[xpu_%d] P2P ioctl done ret=%d cycles=%llu\n", xpd->devfile_id, ret, cycles);
     args.time_ns = cycles;
 
     if (copy_to_user(argp, &args, sizeof(args)))

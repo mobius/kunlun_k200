@@ -480,11 +480,8 @@ static inline int xpuhw_edma_poll_wait(void __iomem *reg, u32 channel, u64 *cycl
     return -XPUERR_DMATIMEOUT;
 }
 
-static inline int __edma_read_locked(void __iomem *base, u64 dst_dev, u64 src_host, size_t sz,
-                                     int ch, u64 *cycles)
+static inline void __edma_read_start(void __iomem *base, u64 dst_dev, u64 src_host, size_t sz, int ch)
 {
-    int ret = 0;
-
     // DMA Transfer Size register (0x308)
     edma_regwl(base, 0x308 + ch * 0x200, sz);
     // SAR Low register (0x30c)
@@ -496,11 +493,15 @@ static inline int __edma_read_locked(void __iomem *base, u64 dst_dev, u64 src_ho
     // DAR High register (0x318)
     edma_regwl(base, 0x318 + ch * 0x200, high32(dst_dev));
 
-    // Clear DMA Read Interrupt Status before Doorbell?
-    // Write DMA Read Interrupt Clear Register (0xac)
+    // Clear DMA Read Interrupt Status before Doorbell
     edma_regwl(base, 0xac, ((0x1 << ch) | (0x1 << (ch + 16))));
     // DMA Read Doorbell register (0x030)
     edma_regwl(base, 0x30, (ch & 0x7));
+}
+
+static inline int __edma_read_wait(void __iomem *base, int ch, u64 *cycles)
+{
+    int ret;
 
     // polling on DMA Read Interrupt Status Register (0xa0)
     ret = xpuhw_edma_poll_wait(base + 0xa0, ch, cycles);
@@ -511,15 +512,19 @@ static inline int __edma_read_locked(void __iomem *base, u64 dst_dev, u64 src_ho
     }
 
     edma_regwl(base, 0xac, ((0x1 << ch) | (0x1 << (ch + 16))));
-
     return ret;
 }
 
-static inline int __edma_write_locked(void __iomem *base, u64 dst_host, u64 src_dev, size_t sz,
-                                      int ch, u64 *cycles)
+static inline int __edma_read_locked(void __iomem *base, u64 dst_dev, u64 src_host, size_t sz,
+                                     int ch, u64 *cycles)
 {
-    int ret = 0;
+    __edma_read_start(base, dst_dev, src_host, sz, ch);
+    return __edma_read_wait(base, ch, cycles);
+}
 
+static inline void __edma_write_start(void __iomem *base, u64 dst_host, u64 src_dev, size_t sz,
+                                      int ch)
+{
     // DMA Transfer Size register (0x208)
     edma_regwl(base, 0x208 + ch * 0x200, sz);
     // SAR Low register (0x20c)
@@ -531,11 +536,15 @@ static inline int __edma_write_locked(void __iomem *base, u64 dst_host, u64 src_
     // DAR High register (0x218)
     edma_regwl(base, 0x218 + ch * 0x200, high32(dst_host));
 
-    // Clear DMA Write Interrupt Status before Doorbell?
-    // Write DMA Write Interrupt Clear Register (0x58)
+    // Clear DMA Write Interrupt Status before Doorbell
     edma_regwl(base, 0x58, ((0x1 << ch) | (0x1 << (ch + 16))));
     // DMA Write Doorbell register (0x010)
     edma_regwl(base, 0x10, (ch & 0x7));
+}
+
+static inline int __edma_write_wait(void __iomem *base, int ch, u64 *cycles)
+{
+    int ret;
 
     // polling on DMA Write Interrupt Status Register (0x4c)
     ret = xpuhw_edma_poll_wait(base + 0x4c, ch, cycles);
@@ -546,60 +555,115 @@ static inline int __edma_write_locked(void __iomem *base, u64 dst_host, u64 src_
     }
 
     edma_regwl(base, 0x58, ((0x1 << ch) | (0x1 << (ch + 16))));
+    return ret;
+}
 
+static inline int __edma_write_locked(void __iomem *base, u64 dst_host, u64 src_dev, size_t sz,
+                                      int ch, u64 *cycles)
+{
+    __edma_write_start(base, dst_host, src_dev, sz, ch);
+    return __edma_write_wait(base, ch, cycles);
+}
+
+static inline int edma_precheck(struct xpu_edma *edma)
+{
+    if (xpu_device_disabled_or_in_reset(edma->xpd->xdev))
+        return -XPUERR_PEERRESET;
+    if (!edma->enable)
+        return -XPUERR_PEERRESET;
+    return 0;
+}
+
+inline int xpuhw_edma_read_start(struct xpu_edma *edma, u64 dst_dev, u64 src_host, size_t sz)
+{
+    void __iomem *base = edma->xpd->xdev->edma_base;
+    int           ch   = edma->channel;
+    int           ret;
+
+    ret = edma_precheck(edma);
+    if (ret)
+        return ret;
+
+    LOGL1("[xpu_%d] RD start 0x%llx -> 0x%llx sz= 0x%zx ch= %d\n", edma->xpd->devfile_id, src_host,
+          dst_dev, sz, ch);
+    __edma_read_start(base, dst_dev, src_host, sz, ch);
+    return 0;
+}
+
+inline int xpuhw_edma_read_wait(struct xpu_edma *edma, u64 *cycles)
+{
+    void __iomem *base = edma->xpd->xdev->edma_base;
+    int           ch   = edma->channel;
+    int           ret;
+
+    ret = edma_precheck(edma);
+    if (ret)
+        return ret;
+
+    ret = __edma_read_wait(base, ch, cycles);
+    if (cycles)
+        LOGL1("RD wait reg= %px cycles= %llu\n", base + 0xa0, *cycles);
+    return ret;
+}
+
+inline int xpuhw_edma_write_start(struct xpu_edma *edma, u64 dst_host, u64 src_dev, size_t sz)
+{
+    void __iomem *base = edma->xpd->xdev->edma_base;
+    int           ch   = edma->channel;
+    int           ret;
+
+    ret = edma_precheck(edma);
+    if (ret)
+        return ret;
+
+    LOGL1("[xpu_%d] WR start 0x%llx -> 0x%llx sz= 0x%zx ch= %d\n", edma->xpd->devfile_id, src_dev,
+          dst_host, sz, ch);
+    __edma_write_start(base, dst_host, src_dev, sz, ch);
+    return 0;
+}
+
+inline int xpuhw_edma_write_wait(struct xpu_edma *edma, u64 *cycles)
+{
+    void __iomem *base = edma->xpd->xdev->edma_base;
+    int           ch   = edma->channel;
+    int           ret;
+
+    ret = edma_precheck(edma);
+    if (ret)
+        return ret;
+
+    ret = __edma_write_wait(base, ch, cycles);
+    if (cycles)
+        LOGL1("WR wait reg= %px cycles= %llu\n", base + 0x4c, *cycles);
     return ret;
 }
 
 inline int xpuhw_edma_read_locked(struct xpu_edma *edma, u64 dst_dev, u64 src_host, size_t sz,
                                   u64 *cycles)
 {
-    void __iomem *base = edma->xpd->xdev->edma_base;
-    int           ch   = edma->channel;
-    u64           ret  = 0;
-
-    if (xpu_device_disabled_or_in_reset(edma->xpd->xdev))
-        return -XPUERR_PEERRESET;
-
-    if (!edma->enable)
-        return -XPUERR_PEERRESET;
-
-    LOGL1("[xpu_%d] 0x%llx -> 0x%llx sz= 0x%zx ch= %d\n", edma->xpd->devfile_id, src_host, dst_dev,
-          sz, ch);
+    int ret;
 
     if (cycles == NULL)
         return -XPUERR_INVALID_PARAM;
 
-    ret = __edma_read_locked(base, dst_dev, src_host, sz, ch, cycles);
-
-    LOGL1("poll reg= %px cycles= %llu\n", base + 0xa0, *cycles);
-
-    return ret;
+    ret = xpuhw_edma_read_start(edma, dst_dev, src_host, sz);
+    if (ret)
+        return ret;
+    return xpuhw_edma_read_wait(edma, cycles);
 }
 
 inline int xpuhw_edma_write_locked(struct xpu_edma *edma, u64 dst_host, u64 src_dev, size_t sz,
                                    u64 *cycles)
 {
-    void __iomem *base = edma->xpd->xdev->edma_base;
-    int           ch   = edma->channel;
-    u64           ret  = 0;
-
-    if (xpu_device_disabled_or_in_reset(edma->xpd->xdev))
-        return -XPUERR_PEERRESET;
-
-    if (!edma->enable)
-        return -XPUERR_PEERRESET;
-
-    LOGL1("[xpu_%d] 0x%llx -> 0x%llx sz= 0x%zx ch= %d\n", edma->xpd->devfile_id, src_dev, dst_host,
-          sz, ch);
+    int ret;
 
     if (cycles == NULL)
         return -XPUERR_INVALID_PARAM;
 
-    ret = __edma_write_locked(base, dst_host, src_dev, sz, ch, cycles);
-
-    LOGL1("poll reg= %px cycles= %llu\n", base + 0x4c, *cycles);
-
-    return ret;
+    ret = xpuhw_edma_write_start(edma, dst_host, src_dev, sz);
+    if (ret)
+        return ret;
+    return xpuhw_edma_write_wait(edma, cycles);
 }
 
 // u32 Register Write using edma engine
