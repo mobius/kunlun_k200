@@ -1,0 +1,27 @@
+S8 App Pipeline Results  2026-07-15T10:17:01+08:00
+Driver: B8FE90CAFA106B0B5E95A2A
+kl1_dma_direct=1
+kl1_bounce_pipe=1
+
+=== batch=32 feat=2048 layers=8 ===
+Guidance: prefer xpu_host_alloc I/O + FP16 compute (K<=4096)
+config                             img/s        ms    GFLOPS  notes
+  pageable+FP32 e2e             12514.3 img/s     2.56 ms    839.8 GFLOPS  host=pageable dtype=FP32 IO=H2D+D2H
+  pageable+FP16 e2e             22531.0 img/s     1.42 ms   1512.0 GFLOPS  host=pageable dtype=FP16 IO=H2D+D2H
+  host_alloc+FP32 e2e           12743.9 img/s     2.51 ms    855.2 GFLOPS  host=host_alloc dtype=FP32 IO=H2D+D2H
+  host_alloc+FP16 e2e           22861.0 img/s     1.40 ms   1534.2 GFLOPS  host=host_alloc dtype=FP16 IO=H2D+D2H
+  host_alloc+FP16 compute       23456.4 img/s     1.36 ms   1574.1 GFLOPS  host=host_alloc dtype=FP16 IO=-
+  pageable+FP16 compute         23451.8 img/s     1.36 ms   1573.8 GFLOPS  host=pageable dtype=FP16 IO=-
+Recommended app defaults:
+  2) Run compute in FP16 with ncluster=4; keep K in 1024..4096
+
+=== batch=64 feat=4096 layers=1 (more I/O share) ===
+Guidance: prefer xpu_host_alloc I/O + FP16 compute (K<=4096)
+config                             img/s        ms    GFLOPS  notes
+  pageable+FP32 e2e             27515.9 img/s     2.33 ms    923.3 GFLOPS  host=pageable dtype=FP32 IO=H2D+D2H
+  pageable+FP16 e2e             55414.9 img/s     1.15 ms   1859.4 GFLOPS  host=pageable dtype=FP16 IO=H2D+D2H
+  host_alloc+FP32 e2e           29889.4 img/s     2.14 ms   1002.9 GFLOPS  host=host_alloc dtype=FP32 IO=H2D+D2H
+  host_alloc+FP16 e2e           59803.3 img/s     1.07 ms   2006.7 GFLOPS  host=host_alloc dtype=FP16 IO=H2D+D2H
+  host_alloc+FP16 compute       65679.8 img/s     0.97 ms   2203.8 GFLOPS  host=host_alloc dtype=FP16 IO=-
+  pageable+FP16 compute         64918.6 img/s     0.99 ms   2178.3 GFLOPS  host=pageable dtype=FP16 IO=-
+  2) Run compute in FP16 with ncluster=4; keep K in 1024..4096

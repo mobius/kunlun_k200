@@ -47,11 +47,15 @@
 | 1-thread dispatch | ~26 µs |
 | 4-thread dispatch | ~25 µs |
 
-### Inference
+### Inference / App guidance (S8)
 
-| Model | Framework | Precision | Batch | img/s |
-|-------|-----------|:---------:|:-----:|:-----:|
-| ResNet-50 | PaddlePaddle 2.6.1 | FP32 | 1 | 1069 |
+| Model / Workload | Framework | Precision | Batch | img/s | Notes |
+|------------------|-----------|:---------:|:-----:|------:|-------|
+| ResNet-50 | PaddlePaddle 2.6.1 | FP32 | 1 | 1069 | historical container run |
+| FC pipeline e2e | native xdnn | FP32 pageable | 32 | ~12.5k | `xpu_app_pipeline` |
+| FC pipeline e2e | native xdnn | **FP16 host_alloc** | 32 | **~22.8k** | **~1.8× vs FP32** |
+
+App defaults: `xpu_host_alloc` for staging, **FP16** compute with `ncluster=4`, keep GEMM K in 1024–4096. See `docs/impl/20260715-s8-app-guidance.md`.
 
 ## Driver fixes (KL1 / K200)
 
@@ -80,15 +84,18 @@ Detailed write-ups: `docs/impl/20260714-s5-p2p-pingpong.md`, `docs/plan/20260612
 .
 ├── benchmarks/
 │   ├── xpu_perf_test.cpp       # GEMM + bandwidth (incl. host_alloc)
+│   ├── xpu_app_pipeline.cpp    # S8 e2e pageable/pinned × FP32/FP16
 │   ├── xpu_int8_probe.cpp      # S3 INT8 availability probe
 │   └── xpu_denoise.cpp
 ├── tests/
 │   ├── test_p2p.cpp
 │   ├── test_p2p_verify.cpp     # P2P data checksum
+│   ├── test_pageable_verify.cpp
 │   └── test_host_alloc.cpp
 ├── scripts/
 │   ├── install_driver.sh       # Build ko install + reload
 │   ├── run_driver_regression.sh
+│   ├── run_s8_app_bench.sh
 │   └── run_perf_tests.sh       # Podman / vendor tool suite
 ├── docs/                       # Research, plan, impl notes (2026-06)
 ├── kunlun-driver/              # Kernel 4.33 + KL1 modifications
@@ -107,6 +114,10 @@ make all
 # Bandwidth only (pageable vs host_alloc)
 ./benchmarks/xpu_perf_test 0 bw
 
+# S8 app pipeline (pageable/host_alloc × FP32/FP16 e2e)
+make benchmarks/xpu_app_pipeline && ./benchmarks/xpu_app_pipeline -d 0
+# or: scripts/run_s8_app_bench.sh
+
 # Driver regression gate (S7: correctness + S4/S5/S6 BW floors)
 make regression
 
@@ -117,7 +128,8 @@ make benchmarks/xpu_int8_probe && ./benchmarks/xpu_int8_probe 0
 ### Paddle inference
 
 ```bash
-python3 scripts/paddle_infer_benchmark.py --model paddle_models --batch_size 1
+# Requires paddlepaddle-xpu in the environment
+python3 scripts/paddle_infer_benchmark.py --model paddle_models --batch 1,8,32
 ```
 
 ## Environment

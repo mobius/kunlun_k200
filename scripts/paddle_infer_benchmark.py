@@ -1,57 +1,91 @@
-import paddle.inference as paddle_infer
-import numpy as np
-import time
+#!/usr/bin/env python3
+"""S8: Paddle Inference ResNet-50 benchmark with batch sweep.
+
+Usage (host with paddlepaddle-xpu, or inside paddle-xpu container):
+  python3 scripts/paddle_infer_benchmark.py --model paddle_models --batch 1,8,32
+"""
+from __future__ import annotations
+
+import argparse
 import os
+import time
+from pathlib import Path
 
-os.environ['FLAGS_selected_xpus'] = '0'
+import numpy as np
 
-config = paddle_infer.Config("/mnt/storage/test_xpu/paddle_models/inference.pdmodel",
-                             "/mnt/storage/test_xpu/paddle_models/inference.pdiparams")
-config.enable_xpu(100)
-config.switch_ir_optim(True)
 
-predictor = paddle_infer.create_predictor(config)
+def find_model(model_dir: Path) -> tuple[str, str]:
+    candidates = [
+        (model_dir / "inference.pdmodel", model_dir / "inference.pdiparams"),
+        (model_dir / "ResNet50_infer" / "inference.pdmodel",
+         model_dir / "ResNet50_infer" / "inference.pdiparams"),
+    ]
+    for m, p in candidates:
+        if m.is_file() and p.is_file():
+            return str(m), str(p)
+    raise FileNotFoundError(f"no inference model under {model_dir}")
 
-input_names = predictor.get_input_names()
-input_tensor = predictor.get_input_handle(input_names[0])
 
-batch_size = 1
-img_h = 224
-img_w = 224
-warmup = 10
-runs = 100
+def bench(model_dir: Path, batches: list[int], runs: int, warmup: int, device: int) -> list[dict]:
+    import paddle.inference as pi
 
-data = np.random.randn(batch_size, 3, img_h, img_w).astype("float32")
-input_tensor.reshape([batch_size, 3, img_h, img_w])
-input_tensor.copy_from_cpu(data)
+    os.environ["FLAGS_selected_xpus"] = str(device)
+    pdmodel, pdiparams = find_model(model_dir)
+    results = []
 
-print(f"=== Paddle Inference ResNet-50 Benchmark ===")
-print(f"Batch size: {batch_size}, Input: {img_h}x{img_w}")
-print(f"Warmup: {warmup}, Runs: {runs}")
+    for batch in batches:
+        cfg = pi.Config(pdmodel, pdiparams)
+        cfg.enable_xpu(100)
+        cfg.switch_ir_optim(True)
+        pred = pi.create_predictor(cfg)
+        name = pred.get_input_names()[0]
+        handle = pred.get_input_handle(name)
+        data = np.random.randn(batch, 3, 224, 224).astype("float32")
+        handle.reshape([batch, 3, 224, 224])
+        handle.copy_from_cpu(data)
 
-for _ in range(warmup):
-    predictor.run()
+        for _ in range(warmup):
+            pred.run()
 
-start = time.perf_counter()
-for _ in range(runs):
-    predictor.run()
-end = time.perf_counter()
+        t0 = time.perf_counter()
+        for _ in range(runs):
+            handle.copy_from_cpu(data)
+            pred.run()
+        t1 = time.perf_counter()
 
-elapsed = end - start
-latency_ms = elapsed / runs * 1000
-throughput = batch_size * runs / elapsed
+        thr = batch * runs / (t1 - t0)
+        lat = (t1 - t0) / runs * 1000.0
+        row = {"batch": batch, "img_s": thr, "ms": lat}
+        results.append(row)
+        print(f"batch={batch:3d}  {thr:8.1f} img/s  {lat:7.2f} ms/batch")
 
-print(f"\nTotal time: {elapsed:.3f}s")
-print(f"Avg latency: {latency_ms:.2f} ms/batch")
-print(f"Throughput: {throughput:.1f} images/sec")
+    return results
 
-with open('/mnt/storage/test_xpu/results/paddle_resnet50_infer.txt', 'w') as f:
-    f.write(f"ResNet-50 Paddle Inference XPU Benchmark\n")
-    f.write(f"Date: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-    f.write(f"Batch size: {batch_size}\n")
-    f.write(f"Input: {img_h}x{img_w}\n")
-    f.write(f"Runs: {runs}\n")
-    f.write(f"Avg latency: {latency_ms:.2f} ms/batch\n")
-    f.write(f"Throughput: {throughput:.1f} images/sec\n")
 
-print("Results saved to /mnt/storage/test_xpu/results/paddle_resnet50_infer.txt")
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default="paddle_models")
+    ap.add_argument("--batch", default="1,8,32", help="comma-separated batch sizes")
+    ap.add_argument("--runs", type=int, default=50)
+    ap.add_argument("--warmup", type=int, default=10)
+    ap.add_argument("--device", type=int, default=0)
+    ap.add_argument("--out", default="results/s8_paddle_resnet50.txt")
+    args = ap.parse_args()
+
+    batches = [int(x) for x in args.batch.split(",") if x.strip()]
+    print("=== S8 Paddle Inference ResNet-50 ===")
+    print(f"model={args.model} runs={args.runs} warmup={args.warmup} device={args.device}")
+    rows = bench(Path(args.model), batches, args.runs, args.warmup, args.device)
+
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w") as f:
+        f.write(f"S8 Paddle ResNet-50  {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        for r in rows:
+            f.write(f"batch={r['batch']}  {r['img_s']:.1f} img/s  {r['ms']:.2f} ms\n")
+    print(f"wrote {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
