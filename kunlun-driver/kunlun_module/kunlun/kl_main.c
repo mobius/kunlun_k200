@@ -678,6 +678,12 @@ int kl1_dma_direct = 1;
 module_param(kl1_dma_direct, int, 0644);
 MODULE_PARM_DESC(kl1_dma_direct, "KL1 direct EDMA for xpu_host_alloc (S4, 1=on, 0=bounce)");
 
+/* S6: overlap copy_{from,to}_user with EDMA on a second channel. 0 = legacy serial. */
+int kl1_bounce_pipe = 1;
+module_param(kl1_bounce_pipe, int, 0644);
+MODULE_PARM_DESC(kl1_bounce_pipe,
+                 "KL1 pageable bounce pipeline (1=double-buffer if 2 ch free, 0=serial)");
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("BAIDU-ISA");
 MODULE_DESCRIPTION("kunlun");

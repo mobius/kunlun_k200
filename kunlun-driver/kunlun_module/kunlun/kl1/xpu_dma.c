@@ -308,27 +308,23 @@ out_up:
     return ret;
 }
 
-/* Memcpy between device memory and host cpu memory
- * Memory will be split into multiple $KL1_DMA_KBUF_SIZE parts, and issue one DMA request for each
- * part.
+/*
+ * Legacy serial bounce (pre-S6). Kept intact as the crash-safe baseline and as
+ * fallback when kl1_bounce_pipe=0, only one channel is free, or transfer fits
+ * in a single kbuf chunk.
  */
-int dma_device_to_host(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *total_cycles)
+static int dma_device_to_host_serial(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz,
+                                     u64 *total_cycles)
 {
-    struct mm_struct *mm = current->mm;
-    int              i      = 0;
-    int              ret    = 0;
-    size_t           dmasz  = 0;
-    int              ch     = -1;
+    int              i = 0, ret = 0, ch = -1;
+    size_t           dmasz;
     u64              cycles = 0;
     struct xpu_edma *edma;
 
-    if (kl1_dma_direct && mm && kl1_user_range_is_host_alloc(mm, (unsigned long)dst, cpsz))
-        return dma_device_to_host_direct(xpd, (unsigned long)dst, src, cpsz, total_cycles);
-
-    if (total_cycles == NULL)
-        return -XPUERR_INVALID_PARAM;
-
-    down(&xpd->wrch_sema);
+    if (down_timeout(&xpd->wrch_sema, 60 * HZ)) {
+        LOGW("[xpu_%d] D2H serial wrch_sema timeout\n", xpd->devfile_id);
+        return -XPUERR_TIMEOUT;
+    }
 
     ch = get_wrch(xpd);
     if (ch < 0) {
@@ -340,11 +336,10 @@ int dma_device_to_host(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *tota
     edma          = &xpd->wrch_edma[ch];
     *total_cycles = 0;
 
-    LOGL2("[xpu_%d] dev= 0x%llx host= u0x%llx 0x%llx sz= 0x%llx\n", xpd->devfile_id, src, dst,
-          edma->dmabuf, cpsz);
+    LOGL2("[xpu_%d] D2H serial dev=0x%llx host=u0x%llx sz=0x%llx\n", xpd->devfile_id, src, dst,
+          cpsz);
 
     while (cpsz) {
-        // DMA size is $KL1_DMA_KBUF_SIZE at most
         dmasz = (cpsz < KL1_DMA_KBUF_SIZE) ? cpsz : KL1_DMA_KBUF_SIZE;
 
         mutex_lock(&edma->lock);
@@ -369,30 +364,23 @@ int dma_device_to_host(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *tota
     }
 
     put_wrch(xpd, ch);
-
 err_out:
     up(&xpd->wrch_sema);
-
     return ret;
 }
 
-int dma_host_to_device(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *total_cycles)
+static int dma_host_to_device_serial(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz,
+                                     u64 *total_cycles)
 {
-    struct mm_struct *mm = current->mm;
-    int              i      = 0;
-    int              ret    = 0;
-    size_t           dmasz  = 0;
-    int              ch     = -1;
+    int              i = 0, ret = 0, ch = -1;
+    size_t           dmasz;
     u64              cycles = 0;
     struct xpu_edma *edma;
 
-    if (kl1_dma_direct && mm && kl1_user_range_is_host_alloc(mm, (unsigned long)src, cpsz))
-        return dma_host_to_device_direct(xpd, dst, (unsigned long)src, cpsz, total_cycles);
-
-    if (total_cycles == NULL)
-        return -XPUERR_INVALID_PARAM;
-
-    down(&xpd->rdch_sema);
+    if (down_timeout(&xpd->rdch_sema, 60 * HZ)) {
+        LOGW("[xpu_%d] H2D serial rdch_sema timeout\n", xpd->devfile_id);
+        return -XPUERR_TIMEOUT;
+    }
 
     ch = get_rdch(xpd);
     if (ch < 0) {
@@ -404,15 +392,14 @@ int dma_host_to_device(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *tota
     edma          = &xpd->rdch_edma[ch];
     *total_cycles = 0;
 
-    LOGL2("[xpu_%d] host= u0x%llx 0x%llx dev= 0x%llx sz= 0x%llx\n", xpd->devfile_id, src,
-          edma->dmabuf, dst, cpsz);
+    LOGL2("[xpu_%d] H2D serial host=u0x%llx dev=0x%llx sz=0x%llx\n", xpd->devfile_id, src, dst,
+          cpsz);
 
     while (cpsz) {
-        // DMA length is $KL1_DMA_KBUF_SIZE at most
         dmasz = (cpsz < KL1_DMA_KBUF_SIZE) ? cpsz : KL1_DMA_KBUF_SIZE;
         ret   = copy_from_user(edma->kbuf, (void *)src, dmasz);
         if (ret != 0) {
-            LOGW("Copy from host to devie error, ret=%d, sz=0x%zx\n", ret, dmasz);
+            LOGW("Copy from host to device error, ret=%d, sz=0x%zx\n", ret, dmasz);
             ret = -EFAULT;
             break;
         }
@@ -421,21 +408,321 @@ int dma_host_to_device(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *tota
         ret = xpuhw_edma_read_locked(edma, dst + (u64)KL1_DMA_KBUF_SIZE * i, (u64)edma->dmabuf,
                                      dmasz, &cycles);
         mutex_unlock(&edma->lock);
-
         if (ret != 0)
             break;
 
         *total_cycles += cycles;
-
         cpsz -= dmasz;
         src += dmasz;
         ++i;
     }
-    put_rdch(xpd, ch);
 
+    put_rdch(xpd, ch);
 err_out:
     up(&xpd->rdch_sema);
     return ret;
+}
+
+/*
+ * S6 D2H pipeline: EDMA(chunk N+1) overlaps copy_to_user(chunk N).
+ * Uses two write channels' coherent kbufs. On any failure drains in-flight
+ * DMA then falls through with error (never leaves channel stuck if wait ok).
+ */
+static int dma_device_to_host_pipe(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz,
+                                   u64 *total_cycles)
+{
+    struct xpu_edma *edma[2];
+    int              ch[2] = { -1, -1 };
+    int              ret = 0, ping = 0, got_second = 0;
+    u64              cycles = 0, remain, dev_off, host_off;
+    size_t           dmasz, prev_dmasz = 0;
+    bool             inflight = false;
+
+    if (down_timeout(&xpd->wrch_sema, 60 * HZ)) {
+        LOGW("[xpu_%d] D2H pipe wrch_sema timeout\n", xpd->devfile_id);
+        return -XPUERR_TIMEOUT;
+    }
+    if (down_trylock(&xpd->wrch_sema) == 0)
+        got_second = 1;
+    else {
+        /* Only one channel — use serial (already hold one wrch_sema). */
+        up(&xpd->wrch_sema);
+        return dma_device_to_host_serial(xpd, dst, src, cpsz, total_cycles);
+    }
+
+    ch[0] = get_wrch(xpd);
+    ch[1] = get_wrch(xpd);
+    if (ch[0] < 0 || ch[1] < 0 || !xpd->wrch_edma[ch[0]].enable ||
+        !xpd->wrch_edma[ch[1]].enable || !xpd->wrch_edma[ch[0]].kbuf ||
+        !xpd->wrch_edma[ch[1]].kbuf) {
+        if (ch[1] >= 0)
+            put_wrch(xpd, ch[1]);
+        if (ch[0] >= 0)
+            put_wrch(xpd, ch[0]);
+        up(&xpd->wrch_sema);
+        up(&xpd->wrch_sema);
+        return dma_device_to_host_serial(xpd, dst, src, cpsz, total_cycles);
+    }
+
+    edma[0]       = &xpd->wrch_edma[ch[0]];
+    edma[1]       = &xpd->wrch_edma[ch[1]];
+    *total_cycles = 0;
+    remain        = cpsz;
+    dev_off       = src;
+    host_off      = dst;
+
+    LOGL2("[xpu_%d] D2H pipe sz=0x%llx ch=%d,%d\n", xpd->devfile_id, cpsz, ch[0], ch[1]);
+
+    /* Lock by ascending channel index to avoid AB-BA deadlock across threads. */
+    if (ch[0] < ch[1]) {
+        mutex_lock(&edma[0]->lock);
+        mutex_lock(&edma[1]->lock);
+    } else {
+        mutex_lock(&edma[1]->lock);
+        mutex_lock(&edma[0]->lock);
+    }
+
+    dmasz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
+    ret   = xpuhw_edma_write_start(edma[0], (u64)edma[0]->dmabuf, dev_off, dmasz);
+    if (ret)
+        goto out_unlock;
+    inflight   = true;
+    prev_dmasz = dmasz;
+    dev_off += dmasz;
+    remain -= dmasz;
+    ping = 0;
+
+    while (remain) {
+        size_t next_sz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
+        int    next    = ping ^ 1;
+
+        /* Kick next DMA, then wait+copy previous (CPU overlaps with next DMA). */
+        ret = xpuhw_edma_write_start(edma[next], (u64)edma[next]->dmabuf, dev_off, next_sz);
+        if (ret)
+            goto out_unlock;
+
+        ret = xpuhw_edma_write_wait(edma[ping], &cycles);
+        if (ret) {
+            /* next is in flight — drain it before exit */
+            u64 discard = 0;
+            (void)xpuhw_edma_write_wait(edma[next], &discard);
+            inflight = false;
+            goto out_unlock;
+        }
+        *total_cycles += cycles;
+
+        ret = copy_to_user((void *)host_off, edma[ping]->kbuf, prev_dmasz);
+        if (ret != 0) {
+            u64 discard = 0;
+            (void)xpuhw_edma_write_wait(edma[next], &discard);
+            inflight = false;
+            LOGW("Copy to user error ret=%d\n", ret);
+            ret = -EFAULT;
+            goto out_unlock;
+        }
+
+        host_off += prev_dmasz;
+        prev_dmasz = next_sz;
+        dev_off += next_sz;
+        remain -= next_sz;
+        ping = next;
+        inflight = true;
+    }
+
+    ret = xpuhw_edma_write_wait(edma[ping], &cycles);
+    inflight = false;
+    if (ret)
+        goto out_unlock;
+    *total_cycles += cycles;
+
+    ret = copy_to_user((void *)host_off, edma[ping]->kbuf, prev_dmasz);
+    if (ret != 0) {
+        LOGW("Copy to user error ret=%d\n", ret);
+        ret = -EFAULT;
+    }
+
+out_unlock:
+    if (ret && inflight) {
+        u64 discard = 0;
+        (void)xpuhw_edma_write_wait(edma[ping], &discard);
+    }
+    if (ch[0] < ch[1]) {
+        mutex_unlock(&edma[1]->lock);
+        mutex_unlock(&edma[0]->lock);
+    } else {
+        mutex_unlock(&edma[0]->lock);
+        mutex_unlock(&edma[1]->lock);
+    }
+
+    put_wrch(xpd, ch[1]);
+    put_wrch(xpd, ch[0]);
+    up(&xpd->wrch_sema);
+    up(&xpd->wrch_sema);
+    return ret;
+}
+
+/*
+ * S6 H2D pipeline: copy_from_user(chunk N+1) overlaps EDMA(chunk N).
+ */
+static int dma_host_to_device_pipe(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz,
+                                   u64 *total_cycles)
+{
+    struct xpu_edma *edma[2];
+    int              ch[2] = { -1, -1 };
+    int              ret = 0, ping = 0;
+    u64              cycles = 0, remain, dev_off, host_off;
+    size_t           dmasz, prev_dmasz = 0;
+    bool             inflight = false;
+
+    if (down_timeout(&xpd->rdch_sema, 60 * HZ)) {
+        LOGW("[xpu_%d] H2D pipe rdch_sema timeout\n", xpd->devfile_id);
+        return -XPUERR_TIMEOUT;
+    }
+    if (down_trylock(&xpd->rdch_sema) != 0) {
+        up(&xpd->rdch_sema);
+        return dma_host_to_device_serial(xpd, dst, src, cpsz, total_cycles);
+    }
+
+    ch[0] = get_rdch(xpd);
+    ch[1] = get_rdch(xpd);
+    if (ch[0] < 0 || ch[1] < 0 || !xpd->rdch_edma[ch[0]].enable ||
+        !xpd->rdch_edma[ch[1]].enable || !xpd->rdch_edma[ch[0]].kbuf ||
+        !xpd->rdch_edma[ch[1]].kbuf) {
+        if (ch[1] >= 0)
+            put_rdch(xpd, ch[1]);
+        if (ch[0] >= 0)
+            put_rdch(xpd, ch[0]);
+        up(&xpd->rdch_sema);
+        up(&xpd->rdch_sema);
+        return dma_host_to_device_serial(xpd, dst, src, cpsz, total_cycles);
+    }
+
+    edma[0]       = &xpd->rdch_edma[ch[0]];
+    edma[1]       = &xpd->rdch_edma[ch[1]];
+    *total_cycles = 0;
+    remain        = cpsz;
+    dev_off       = dst;
+    host_off      = src;
+
+    LOGL2("[xpu_%d] H2D pipe sz=0x%llx ch=%d,%d\n", xpd->devfile_id, cpsz, ch[0], ch[1]);
+
+    if (ch[0] < ch[1]) {
+        mutex_lock(&edma[0]->lock);
+        mutex_lock(&edma[1]->lock);
+    } else {
+        mutex_lock(&edma[1]->lock);
+        mutex_lock(&edma[0]->lock);
+    }
+
+    dmasz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
+    ret   = copy_from_user(edma[0]->kbuf, (void *)host_off, dmasz);
+    if (ret != 0) {
+        LOGW("Copy from host to device error, ret=%d, sz=0x%zx\n", ret, dmasz);
+        ret = -EFAULT;
+        goto out_unlock;
+    }
+    ret = xpuhw_edma_read_start(edma[0], dev_off, (u64)edma[0]->dmabuf, dmasz);
+    if (ret)
+        goto out_unlock;
+    inflight   = true;
+    prev_dmasz = dmasz;
+    host_off += dmasz;
+    dev_off += dmasz;
+    remain -= dmasz;
+    ping = 0;
+
+    while (remain) {
+        size_t next_sz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
+        int    next    = ping ^ 1;
+
+        /* CPU fill next buffer while previous EDMA runs. */
+        ret = copy_from_user(edma[next]->kbuf, (void *)host_off, next_sz);
+        if (ret != 0) {
+            u64 discard = 0;
+            (void)xpuhw_edma_read_wait(edma[ping], &discard);
+            inflight = false;
+            LOGW("Copy from host to device error, ret=%d, sz=0x%zx\n", ret, next_sz);
+            ret = -EFAULT;
+            goto out_unlock;
+        }
+
+        ret = xpuhw_edma_read_wait(edma[ping], &cycles);
+        inflight = false;
+        if (ret)
+            goto out_unlock;
+        *total_cycles += cycles;
+
+        ret = xpuhw_edma_read_start(edma[next], dev_off, (u64)edma[next]->dmabuf, next_sz);
+        if (ret)
+            goto out_unlock;
+        inflight = true;
+
+        host_off += next_sz;
+        dev_off += next_sz;
+        remain -= next_sz;
+        prev_dmasz = next_sz;
+        ping = next;
+    }
+
+    ret = xpuhw_edma_read_wait(edma[ping], &cycles);
+    inflight = false;
+    if (ret)
+        goto out_unlock;
+    *total_cycles += cycles;
+    (void)prev_dmasz;
+
+out_unlock:
+    if (ret && inflight) {
+        u64 discard = 0;
+        (void)xpuhw_edma_read_wait(edma[ping], &discard);
+    }
+    if (ch[0] < ch[1]) {
+        mutex_unlock(&edma[1]->lock);
+        mutex_unlock(&edma[0]->lock);
+    } else {
+        mutex_unlock(&edma[0]->lock);
+        mutex_unlock(&edma[1]->lock);
+    }
+
+    put_rdch(xpd, ch[1]);
+    put_rdch(xpd, ch[0]);
+    up(&xpd->rdch_sema);
+    up(&xpd->rdch_sema);
+    return ret;
+}
+
+/* Memcpy between device memory and host cpu memory (pageable bounce or S4 direct). */
+int dma_device_to_host(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *total_cycles)
+{
+    struct mm_struct *mm = current->mm;
+
+    if (kl1_dma_direct && mm && kl1_user_range_is_host_alloc(mm, (unsigned long)dst, cpsz))
+        return dma_device_to_host_direct(xpd, (unsigned long)dst, src, cpsz, total_cycles);
+
+    if (total_cycles == NULL)
+        return -XPUERR_INVALID_PARAM;
+
+    /* Single chunk or pipe disabled → proven serial path only. */
+    if (!kl1_bounce_pipe || cpsz <= KL1_DMA_KBUF_SIZE)
+        return dma_device_to_host_serial(xpd, dst, src, cpsz, total_cycles);
+
+    return dma_device_to_host_pipe(xpd, dst, src, cpsz, total_cycles);
+}
+
+int dma_host_to_device(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *total_cycles)
+{
+    struct mm_struct *mm = current->mm;
+
+    if (kl1_dma_direct && mm && kl1_user_range_is_host_alloc(mm, (unsigned long)src, cpsz))
+        return dma_host_to_device_direct(xpd, dst, (unsigned long)src, cpsz, total_cycles);
+
+    if (total_cycles == NULL)
+        return -XPUERR_INVALID_PARAM;
+
+    if (!kl1_bounce_pipe || cpsz <= KL1_DMA_KBUF_SIZE)
+        return dma_host_to_device_serial(xpd, dst, src, cpsz, total_cycles);
+
+    return dma_host_to_device_pipe(xpd, dst, src, cpsz, total_cycles);
 }
 
 int dma_device_to_device(struct xpu_pd *xpd, u64 dst, u64 src, u64 sz, u64 *cycles)

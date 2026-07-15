@@ -80,6 +80,12 @@ if [[ "${KL1_DMA_DIRECT:-1}" == "1" ]]; then
 else
     MODARGS+=(kl1_dma_direct=0)
 fi
+# S6 pageable bounce pipeline (default on; set KL1_BOUNCE_PIPE=0 for legacy serial)
+if [[ "${KL1_BOUNCE_PIPE:-1}" == "1" ]]; then
+    MODARGS+=(kl1_bounce_pipe=1)
+else
+    MODARGS+=(kl1_bounce_pipe=0)
+fi
 
 if [[ ${#MODARGS[@]} -gt 0 ]]; then
     modprobe kunlun "${MODARGS[@]}"
@@ -89,11 +95,16 @@ else
 fi
 
 echo "Driver loaded:"
-modinfo kunlun | grep -E 'filename|version|srcversion|kl1_p2p'
+modinfo kunlun | grep -E 'filename|version|srcversion|kl1_p2p|kl1_dma|kl1_bounce'
 sha256sum "$KO_DST" "$KO_SRC"
 
-for param in kl1_p2p_stub kl1_dma_direct; do
+for param in kl1_p2p_stub kl1_dma_direct kl1_bounce_pipe; do
     if [[ ! -f /sys/module/kunlun/parameters/${param} ]]; then
+        # kl1_bounce_pipe only on S6+ builds
+        if [[ "$param" == "kl1_bounce_pipe" ]]; then
+            echo "WARN: ${param} missing (pre-S6 module?)"
+            continue
+        fi
         die "${param} sysfs missing — loaded module does not match ${KO_SRC}. Reboot and rerun."
     fi
     chmod 666 "/sys/module/kunlun/parameters/${param}" 2>/dev/null || true

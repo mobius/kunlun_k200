@@ -27,8 +27,8 @@
 
 | Direction | BW | Notes |
 |-----------|:----:|-------|
-| H2D pageable | ~5.5 GB/s | bounce-buffer DMA |
-| D2H pageable | ~4.9 GB/s | bounce-buffer DMA |
+| H2D pageable (S6) | **~10.1 GB/s** | bounce double-buffer (`kl1_bounce_pipe=1`) |
+| D2H pageable (S6) | **~7.8 GB/s** | same; serial fallback ~5.5/4.9 if pipe=0 |
 | H2D `xpu_host_alloc` (S4) | **~12.5 GB/s** | direct EDMA, `kl1_dma_direct=1` |
 | D2H `xpu_host_alloc` (S4) | **~12.9 GB/s** | ≤256MB; 1GB may fall back if hugepages exhausted |
 
