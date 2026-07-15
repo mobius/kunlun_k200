@@ -120,4 +120,9 @@ echo 0 > /sys/module/kunlun/parameters/kl1_bounce_pipe   # pageable 串行
 | S9 结论清晰 | ✅ |
 | 可维护回退参数 | ✅ |
 
-**本里程碑关闭。** 后续仅接受：明确新业务需求、固件/SDK 升级、或单独立项的高风险 spike（如 SSE 跨 PD）。
+**驱动里程碑关闭。**  
+
+真实案例垂直切片（C1/C2/C3）已另交付：  
+`docs/impl/20260715-real-cases-c1-c2-c3.md`、`results/cases/SUMMARY.md`、`make cases`。
+
+后续仅接受：新业务案例、固件/SDK 升级、或单独立项的高风险 spike（如 SSE 跨 PD）。

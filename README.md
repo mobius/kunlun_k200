@@ -78,7 +78,7 @@ sudo KL1_P2P_STUB=0 KL1_DMA_DIRECT=1 scripts/install_driver.sh
 Debug: `echo 1 > /sys/module/kunlun/parameters/kl1_p2p_stub`  
 Disable S4: `echo 0 > /sys/module/kunlun/parameters/kl1_dma_direct`
 
-Detailed write-ups: `docs/impl/20260714-s5-p2p-pingpong.md`, `docs/plan/20260612-remediation-iteration-plan.md`.
+Detailed write-ups: `docs/impl/` (closure + S4–S9), `docs/plan/20260715-real-world-case-plan.md`, `results/cases/SUMMARY.md`.
 
 ## Project Structure
 
@@ -87,19 +87,22 @@ Detailed write-ups: `docs/impl/20260714-s5-p2p-pingpong.md`, `docs/plan/20260612
 ├── benchmarks/
 │   ├── xpu_perf_test.cpp       # GEMM + bandwidth (incl. host_alloc)
 │   ├── xpu_app_pipeline.cpp    # S8 e2e pageable/pinned × FP32/FP16
+│   ├── xpu_pipeline_p2p.cpp    # C3 same-card dual-PD + P2P
 │   ├── xpu_int8_probe.cpp      # S3 INT8 availability probe
-│   └── xpu_denoise.cpp
+│   └── xpu_denoise.cpp         # C2 FP16 denoise (+ pinned/pageable)
 ├── tests/
 │   ├── test_p2p.cpp
 │   ├── test_p2p_verify.cpp     # P2P data checksum
 │   ├── test_pageable_verify.cpp
 │   └── test_host_alloc.cpp
 ├── scripts/
-│   ├── install_driver.sh       # Build ko install + reload
+│   ├── install_driver.sh
 │   ├── run_driver_regression.sh
-│   ├── run_s8_app_bench.sh
-│   └── run_perf_tests.sh       # Podman / vendor tool suite
-├── docs/                       # Research, plan, impl notes (2026-06)
+│   ├── run_real_cases.sh       # C1+C2+C3
+│   ├── run_c1_resnet.sh / run_c2_denoise.sh / run_c3_p2p_pipeline.sh
+│   └── run_s8_app_bench.sh
+├── results/cases/              # Real-case reports (SUMMARY.md)
+├── docs/                       # Research, plan, impl, closure
 ├── kunlun-driver/              # Kernel 4.33 + KL1 modifications
 └── xdnn-ubuntu_x86_64/         # xdnn SDK 2.0.0.725
 ```
