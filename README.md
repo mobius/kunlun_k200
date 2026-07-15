@@ -2,6 +2,8 @@
 
 2× Kunlun K200 inference cards (4 XPU devices) benchmarked for compute throughput, PCIe bandwidth, and kernel launch latency. Includes xdnn SDK GEMM benchmarks, PaddlePaddle ResNet-50 inference, and KL1 driver fixes for P2P and host memory APIs.
 
+**Status (2026-07-15): milestone closed.** S0–S9 delivered; see `docs/impl/20260715-project-closure.md`.
+
 ## Hardware
 
 | Component | Detail |
