@@ -5,7 +5,7 @@ LDFLAGS = -L/usr/local/xpu-4.33.0/lib64 -L$(ROOT)/xdnn-ubuntu_x86_64/so -lxpuapi
           -Wl,-rpath,/usr/local/xpu-4.33.0/lib64 -Wl,-rpath,$(ROOT)/xdnn-ubuntu_x86_64/so
 
 BENCHMARKS = benchmarks/xpu_perf_test benchmarks/xpu_denoise benchmarks/xpu_int8_probe
-TESTS = tests/test_p2p tests/test_p2p_verify tests/test_host_alloc
+TESTS = tests/test_p2p tests/test_p2p_verify tests/test_host_alloc tests/test_pageable_verify
 
 all: $(BENCHMARKS) $(TESTS)
 
@@ -27,11 +27,17 @@ tests/test_p2p_verify: tests/test_p2p_verify.cpp
 tests/test_host_alloc: tests/test_host_alloc.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
 
+tests/test_pageable_verify: tests/test_pageable_verify.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+
 driver:
 	$(MAKE) -C kunlun-driver modules
 
 driver-install: driver
-	sudo KL1_P2P_STUB=$${KL1_P2P_STUB:-0} KL1_DMA_DIRECT=$${KL1_DMA_DIRECT:-1} scripts/install_driver.sh
+	sudo KL1_P2P_STUB=$${KL1_P2P_STUB:-0} \
+		KL1_DMA_DIRECT=$${KL1_DMA_DIRECT:-1} \
+		KL1_BOUNCE_PIPE=$${KL1_BOUNCE_PIPE:-1} \
+		scripts/install_driver.sh
 
 clean:
 	rm -f $(BENCHMARKS) $(TESTS)
@@ -40,7 +46,9 @@ clean:
 run: benchmarks/xpu_perf_test
 	./benchmarks/xpu_perf_test 0
 
-regression: tests/test_p2p_verify tests/test_host_alloc benchmarks/xpu_perf_test
+# S7 gate: correctness + S4/S5/S6 bandwidth floors
+regression: tests/test_p2p_verify tests/test_host_alloc tests/test_pageable_verify \
+		tests/test_p2p benchmarks/xpu_perf_test
 	scripts/run_driver_regression.sh
 
 .PHONY: all clean run driver driver-install regression

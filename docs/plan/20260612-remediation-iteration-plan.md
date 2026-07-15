@@ -18,6 +18,7 @@
 | S4 | Pinned DMA 直传 | 2–3 天 | S2 完成 | **已完成** → `docs/impl/20260613-s4-pinned-dma.md` |
 | S5 | P2P 零拷贝 + ping-pong + ioctl 修复 | 1 天 | S1/S4 | **已完成** P2P ~11.2 GB/s → `docs/impl/20260714-s5-p2p-pingpong.md` |
 | S6 | pageable bounce 双缓冲（可回退） | 0.5–1 天 | S5 | **已完成** pageable H2D ~10 GB/s → `docs/impl/20260714-s6-bounce-pipeline.md` |
+| S7 | 回归门禁（正确性 + 带宽地板） | 0.5 天 | S4–S6 | **已完成** → `docs/impl/20260715-s7-regression-gate.md` |
 
 每阶段产出 `docs/impl/YYYYMMDD-<phase>-results.md`。
 

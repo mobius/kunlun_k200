@@ -107,7 +107,7 @@ make all
 # Bandwidth only (pageable vs host_alloc)
 ./benchmarks/xpu_perf_test 0 bw
 
-# Driver regression (P2P + host_alloc + bandwidth)
+# Driver regression gate (S7: correctness + S4/S5/S6 BW floors)
 make regression
 
 # INT8 probe
