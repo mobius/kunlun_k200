@@ -24,6 +24,8 @@
 #define __FILENAME__ "xpu_dma.c"
 
 #include <linux/dma-mapping.h>
+#include <linux/mm.h>
+#include <linux/pagemap.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
@@ -32,29 +34,61 @@
 #include "xpu_drv.h"
 #include "xpu_hw.h"
 
+/* S9: pin pageable (optional; 4K non-contig is slow — default off). */
+#define KL1_PAGEABLE_PIN_MIN   (64 * 1024UL)
+#define KL1_PAGEABLE_PIN_MAXPG 512
+#define KL1_DMA_KBUF_ORDER     get_order(KL1_DMA_KBUF_SIZE)
+
 ////////////////////////////
 // Driver DMA implementation
 ////////////////////////////
+
+/*
+ * S9 bounce buffer: normal cached pages + dma_map_single (not dma_alloc_coherent).
+ * Coherent/WC bounce made copy_to/from_user the D2H bottleneck (~7.8 GB/s).
+ * Cached staging should make CPU copy ~memory-speed; EDMA uses bus addr after sync.
+ */
+static inline void kl1_bounce_sync_for_cpu(struct xpu_edma *edma, size_t len)
+{
+    dma_sync_single_for_cpu(&edma->xpd->xdev->pdev->dev, edma->dmabuf, len, DMA_FROM_DEVICE);
+}
+
+static inline void kl1_bounce_sync_for_device(struct xpu_edma *edma, size_t len)
+{
+    dma_sync_single_for_device(&edma->xpd->xdev->pdev->dev, edma->dmabuf, len, DMA_TO_DEVICE);
+}
+
 static inline int xpu_edma_setup(struct xpu_edma *edma, struct xpu_pd *xpd, int ch)
 {
-    int err;
+    struct device *dev;
+    int            err;
 
     edma->enable  = 0;
     edma->xpd     = xpd;
     edma->channel = xpd->id * KL1_EDMA_CHANNEL_NUM_ONE_PD + ch;
     mutex_init(&edma->lock);
 
-    edma->kbuf = dma_alloc_coherent(&edma->xpd->xdev->pdev->dev, KL1_DMA_KBUF_SIZE, &edma->dmabuf,
-                                    GFP_KERNEL | __GFP_ZERO);
+    dev = &edma->xpd->xdev->pdev->dev;
+    edma->kbuf = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, KL1_DMA_KBUF_ORDER);
     if (!edma->kbuf) {
-        LOGW("error dma_alloc_coherent for edma_ch=%d.\n", edma->channel);
+        LOGW("error __get_free_pages for edma_ch=%d order=%d\n", edma->channel,
+             KL1_DMA_KBUF_ORDER);
         err = -XPUERR_NOCPUMEM;
+        goto err_out;
+    }
+
+    edma->dmabuf = dma_map_single(dev, edma->kbuf, KL1_DMA_KBUF_SIZE, DMA_BIDIRECTIONAL);
+    if (dma_mapping_error(dev, edma->dmabuf)) {
+        LOGW("error dma_map_single for edma_ch=%d\n", edma->channel);
+        free_pages((unsigned long)edma->kbuf, KL1_DMA_KBUF_ORDER);
+        edma->kbuf = NULL;
+        err        = -XPUERR_NOCPUMEM;
         goto err_out;
     }
 
     edma->enable = 1;
 
-    LOGL4("DMA ch_%d mapping k= %px pcie= %llx\n", edma->channel, edma->kbuf, edma->dmabuf);
+    LOGL4("DMA ch_%d cached bounce k= %px pcie= %llx\n", edma->channel, edma->kbuf, edma->dmabuf);
     return 0;
 
 err_out:
@@ -63,11 +97,15 @@ err_out:
 
 static void xpu_edma_unsetup(struct xpu_edma *edma)
 {
+    struct device *dev;
+
     if (!edma->enable)
         return;
 
     if (edma->kbuf) {
-        dma_free_coherent(&edma->xpd->xdev->pdev->dev, KL1_DMA_KBUF_SIZE, edma->kbuf, edma->dmabuf);
+        dev = &edma->xpd->xdev->pdev->dev;
+        dma_unmap_single(dev, edma->dmabuf, KL1_DMA_KBUF_SIZE, DMA_BIDIRECTIONAL);
+        free_pages((unsigned long)edma->kbuf, KL1_DMA_KBUF_ORDER);
         edma->kbuf   = NULL;
         edma->dmabuf = 0;
     }
@@ -350,6 +388,7 @@ static int dma_device_to_host_serial(struct xpu_pd *xpd, u64 dst, u64 src, u64 c
             break;
 
         *total_cycles += cycles;
+        kl1_bounce_sync_for_cpu(edma, dmasz);
 
         ret = copy_to_user((void *)dst, edma->kbuf, dmasz);
         if (ret != 0) {
@@ -403,6 +442,7 @@ static int dma_host_to_device_serial(struct xpu_pd *xpd, u64 dst, u64 src, u64 c
             ret = -EFAULT;
             break;
         }
+        kl1_bounce_sync_for_device(edma, dmasz);
 
         mutex_lock(&edma->lock);
         ret = xpuhw_edma_read_locked(edma, dst + (u64)KL1_DMA_KBUF_SIZE * i, (u64)edma->dmabuf,
@@ -423,69 +463,67 @@ err_out:
     return ret;
 }
 
-/*
- * S6 D2H pipeline: EDMA(chunk N+1) overlaps copy_to_user(chunk N).
- * Uses two write channels' coherent kbufs. On any failure drains in-flight
- * DMA then falls through with error (never leaves channel stuck if wait ok).
- */
-static int dma_device_to_host_pipe(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz,
-                                   u64 *total_cycles)
+/* Lock/unlock n edma mutexes in ascending channel-index order (deadlock-free). */
+static void kl1_edma_lock_n(struct xpu_edma **edma, int *ch, int n)
 {
-    struct xpu_edma *edma[2];
-    int              ch[2] = { -1, -1 };
-    int              ret = 0, ping = 0, got_second = 0;
-    u64              cycles = 0, remain, dev_off, host_off;
-    size_t           dmasz, prev_dmasz = 0;
-    bool             inflight = false;
+    int order[3], i, j, t;
 
-    if (down_timeout(&xpd->wrch_sema, 60 * HZ)) {
-        LOGW("[xpu_%d] D2H pipe wrch_sema timeout\n", xpd->devfile_id);
-        return -XPUERR_TIMEOUT;
+    if (n > 3)
+        n = 3;
+    for (i = 0; i < n; i++)
+        order[i] = i;
+    for (i = 0; i < n; i++) {
+        for (j = i + 1; j < n; j++) {
+            if (ch[order[j]] < ch[order[i]]) {
+                t = order[i];
+                order[i] = order[j];
+                order[j] = t;
+            }
+        }
     }
-    if (down_trylock(&xpd->wrch_sema) == 0)
-        got_second = 1;
-    else {
-        /* Only one channel — use serial (already hold one wrch_sema). */
-        up(&xpd->wrch_sema);
-        return dma_device_to_host_serial(xpd, dst, src, cpsz, total_cycles);
+    for (i = 0; i < n; i++)
+        mutex_lock(&edma[order[i]]->lock);
+}
+
+static void kl1_edma_unlock_n(struct xpu_edma **edma, int *ch, int n)
+{
+    int order[3], i, j, t;
+
+    if (n > 3)
+        n = 3;
+    for (i = 0; i < n; i++)
+        order[i] = i;
+    for (i = 0; i < n; i++) {
+        for (j = i + 1; j < n; j++) {
+            if (ch[order[j]] < ch[order[i]]) {
+                t = order[i];
+                order[i] = order[j];
+                order[j] = t;
+            }
+        }
     }
+    for (i = n - 1; i >= 0; i--)
+        mutex_unlock(&edma[order[i]]->lock);
+}
 
-    ch[0] = get_wrch(xpd);
-    ch[1] = get_wrch(xpd);
-    if (ch[0] < 0 || ch[1] < 0 || !xpd->wrch_edma[ch[0]].enable ||
-        !xpd->wrch_edma[ch[1]].enable || !xpd->wrch_edma[ch[0]].kbuf ||
-        !xpd->wrch_edma[ch[1]].kbuf) {
-        if (ch[1] >= 0)
-            put_wrch(xpd, ch[1]);
-        if (ch[0] >= 0)
-            put_wrch(xpd, ch[0]);
-        up(&xpd->wrch_sema);
-        up(&xpd->wrch_sema);
-        return dma_device_to_host_serial(xpd, dst, src, cpsz, total_cycles);
-    }
+/*
+ * S6 D2H: dual-concurrent write EDMA (start next before wait prev).
+ * Kept for A/B via kl1_bounce_d2h=2.
+ */
+static int dma_device_to_host_pipe_conc(struct xpu_pd *xpd, struct xpu_edma **edma, int *ch,
+                                        int nch, u64 dst, u64 src, u64 cpsz, u64 *total_cycles)
+{
+    int    ret = 0, ping = 0;
+    u64    cycles = 0, remain = cpsz, dev_off = src, host_off = dst;
+    size_t dmasz, prev_dmasz = 0;
+    bool   inflight = false;
+    int    next_inflight = -1;
 
-    edma[0]       = &xpd->wrch_edma[ch[0]];
-    edma[1]       = &xpd->wrch_edma[ch[1]];
-    *total_cycles = 0;
-    remain        = cpsz;
-    dev_off       = src;
-    host_off      = dst;
-
-    LOGL2("[xpu_%d] D2H pipe sz=0x%llx ch=%d,%d\n", xpd->devfile_id, cpsz, ch[0], ch[1]);
-
-    /* Lock by ascending channel index to avoid AB-BA deadlock across threads. */
-    if (ch[0] < ch[1]) {
-        mutex_lock(&edma[0]->lock);
-        mutex_lock(&edma[1]->lock);
-    } else {
-        mutex_lock(&edma[1]->lock);
-        mutex_lock(&edma[0]->lock);
-    }
-
+    (void)nch; /* dual only */
     dmasz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
     ret   = xpuhw_edma_write_start(edma[0], (u64)edma[0]->dmabuf, dev_off, dmasz);
     if (ret)
-        goto out_unlock;
+        return ret;
     inflight   = true;
     prev_dmasz = dmasz;
     dev_off += dmasz;
@@ -496,29 +534,30 @@ static int dma_device_to_host_pipe(struct xpu_pd *xpd, u64 dst, u64 src, u64 cps
         size_t next_sz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
         int    next    = ping ^ 1;
 
-        /* Kick next DMA, then wait+copy previous (CPU overlaps with next DMA). */
         ret = xpuhw_edma_write_start(edma[next], (u64)edma[next]->dmabuf, dev_off, next_sz);
         if (ret)
-            goto out_unlock;
+            goto out;
+        next_inflight = next;
 
         ret = xpuhw_edma_write_wait(edma[ping], &cycles);
+        inflight = false;
         if (ret) {
-            /* next is in flight — drain it before exit */
             u64 discard = 0;
             (void)xpuhw_edma_write_wait(edma[next], &discard);
-            inflight = false;
-            goto out_unlock;
+            next_inflight = -1;
+            goto out;
         }
         *total_cycles += cycles;
+        kl1_bounce_sync_for_cpu(edma[ping], prev_dmasz);
 
         ret = copy_to_user((void *)host_off, edma[ping]->kbuf, prev_dmasz);
         if (ret != 0) {
             u64 discard = 0;
             (void)xpuhw_edma_write_wait(edma[next], &discard);
-            inflight = false;
+            next_inflight = -1;
             LOGW("Copy to user error ret=%d\n", ret);
             ret = -EFAULT;
-            goto out_unlock;
+            goto out;
         }
 
         host_off += prev_dmasz;
@@ -527,37 +566,177 @@ static int dma_device_to_host_pipe(struct xpu_pd *xpd, u64 dst, u64 src, u64 cps
         remain -= next_sz;
         ping = next;
         inflight = true;
+        next_inflight = -1;
     }
 
     ret = xpuhw_edma_write_wait(edma[ping], &cycles);
     inflight = false;
     if (ret)
-        goto out_unlock;
+        goto out;
     *total_cycles += cycles;
+    kl1_bounce_sync_for_cpu(edma[ping], prev_dmasz);
 
     ret = copy_to_user((void *)host_off, edma[ping]->kbuf, prev_dmasz);
     if (ret != 0) {
         LOGW("Copy to user error ret=%d\n", ret);
         ret = -EFAULT;
     }
-
-out_unlock:
+out:
     if (ret && inflight) {
         u64 discard = 0;
         (void)xpuhw_edma_write_wait(edma[ping], &discard);
     }
-    if (ch[0] < ch[1]) {
-        mutex_unlock(&edma[1]->lock);
-        mutex_unlock(&edma[0]->lock);
-    } else {
-        mutex_unlock(&edma[0]->lock);
-        mutex_unlock(&edma[1]->lock);
+    if (ret && next_inflight >= 0) {
+        u64 discard = 0;
+        (void)xpuhw_edma_write_wait(edma[next_inflight], &discard);
+    }
+    return ret;
+}
+
+/*
+ * S9 D2H: single-issue pipeline — at most one write EDMA in flight.
+ * Timeline: start0; (wait i; start i+1; copy i)* — copy overlaps next EDMA only.
+ * Avoids dual concurrent write engines (suspected PCIe/EDMA contention on KL1).
+ * Uses 2 or 3 kbufs (triple when third wrch available).
+ */
+static int dma_device_to_host_pipe_s9(struct xpu_pd *xpd, struct xpu_edma **edma, int nch, u64 dst,
+                                      u64 src, u64 cpsz, u64 *total_cycles)
+{
+    int    ret = 0, ping = 0, slot = 0;
+    u64    cycles = 0, remain = cpsz, dev_off = src, host_off = dst;
+    size_t dmasz, prev_dmasz = 0;
+    bool   inflight = false;
+
+    dmasz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
+    ret   = xpuhw_edma_write_start(edma[0], (u64)edma[0]->dmabuf, dev_off, dmasz);
+    if (ret)
+        return ret;
+    inflight   = true;
+    prev_dmasz = dmasz;
+    dev_off += dmasz;
+    remain -= dmasz;
+    ping = 0;
+    slot = 0;
+
+    while (remain) {
+        size_t next_sz = (remain < KL1_DMA_KBUF_SIZE) ? remain : KL1_DMA_KBUF_SIZE;
+        int    next    = (slot + 1) % nch;
+
+        /* Finish current EDMA first — never two write EDMAs concurrent. */
+        ret = xpuhw_edma_write_wait(edma[ping], &cycles);
+        inflight = false;
+        if (ret)
+            goto out;
+        *total_cycles += cycles;
+        kl1_bounce_sync_for_cpu(edma[ping], prev_dmasz);
+
+        /* Kick next EDMA, then CPU-copy previous while it runs. */
+        ret = xpuhw_edma_write_start(edma[next], (u64)edma[next]->dmabuf, dev_off, next_sz);
+        if (ret)
+            goto out;
+        inflight = true;
+
+        ret = copy_to_user((void *)host_off, edma[ping]->kbuf, prev_dmasz);
+        if (ret != 0) {
+            u64 discard = 0;
+            (void)xpuhw_edma_write_wait(edma[next], &discard);
+            inflight = false;
+            LOGW("Copy to user error ret=%d\n", ret);
+            ret = -EFAULT;
+            goto out;
+        }
+
+        host_off += prev_dmasz;
+        prev_dmasz = next_sz;
+        dev_off += next_sz;
+        remain -= next_sz;
+        ping = next;
+        slot = next;
     }
 
-    put_wrch(xpd, ch[1]);
-    put_wrch(xpd, ch[0]);
-    up(&xpd->wrch_sema);
-    up(&xpd->wrch_sema);
+    ret = xpuhw_edma_write_wait(edma[ping], &cycles);
+    inflight = false;
+    if (ret)
+        goto out;
+    *total_cycles += cycles;
+    kl1_bounce_sync_for_cpu(edma[ping], prev_dmasz);
+
+    ret = copy_to_user((void *)host_off, edma[ping]->kbuf, prev_dmasz);
+    if (ret != 0) {
+        LOGW("Copy to user error ret=%d\n", ret);
+        ret = -EFAULT;
+    }
+out:
+    if (ret && inflight) {
+        u64 discard = 0;
+        (void)xpuhw_edma_write_wait(edma[ping], &discard);
+    }
+    return ret;
+}
+
+/*
+ * D2H bounce pipe entry: acquire 2–3 wr channels, dispatch S9 or S6 style.
+ */
+static int dma_device_to_host_pipe(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz,
+                                   u64 *total_cycles)
+{
+    struct xpu_edma *edma[3];
+    int              ch[3] = { -1, -1, -1 };
+    int              nch = 0, i, ret = 0;
+    int              n_sema = 0;
+
+    if (down_timeout(&xpd->wrch_sema, 60 * HZ)) {
+        LOGW("[xpu_%d] D2H pipe wrch_sema timeout\n", xpd->devfile_id);
+        return -XPUERR_TIMEOUT;
+    }
+    n_sema = 1;
+    if (down_trylock(&xpd->wrch_sema) == 0)
+        n_sema = 2;
+    if (n_sema >= 2 && down_trylock(&xpd->wrch_sema) == 0)
+        n_sema = 3;
+
+    if (n_sema < 2) {
+        up(&xpd->wrch_sema);
+        return dma_device_to_host_serial(xpd, dst, src, cpsz, total_cycles);
+    }
+
+    for (i = 0; i < n_sema; i++) {
+        ch[i] = get_wrch(xpd);
+        if (ch[i] < 0 || !xpd->wrch_edma[ch[i]].enable || !xpd->wrch_edma[ch[i]].kbuf)
+            break;
+        edma[i] = &xpd->wrch_edma[ch[i]];
+        nch++;
+    }
+    if (nch < 2) {
+        for (i = 0; i < nch; i++)
+            put_wrch(xpd, ch[i]);
+        for (i = 0; i < n_sema; i++)
+            up(&xpd->wrch_sema);
+        return dma_device_to_host_serial(xpd, dst, src, cpsz, total_cycles);
+    }
+    /* Drop unused semaphores if get_wrch failed mid-way */
+    while (n_sema > nch) {
+        up(&xpd->wrch_sema);
+        n_sema--;
+    }
+
+    *total_cycles = 0;
+    LOGL2("[xpu_%d] D2H pipe sz=0x%llx nch=%d mode=%d\n", xpd->devfile_id, cpsz, nch,
+          kl1_bounce_d2h);
+
+    kl1_edma_lock_n(edma, ch, nch);
+
+    if (kl1_bounce_d2h == 2)
+        ret = dma_device_to_host_pipe_conc(xpd, edma, ch, nch, dst, src, cpsz, total_cycles);
+    else
+        ret = dma_device_to_host_pipe_s9(xpd, edma, nch, dst, src, cpsz, total_cycles);
+
+    kl1_edma_unlock_n(edma, ch, nch);
+
+    for (i = 0; i < nch; i++)
+        put_wrch(xpd, ch[i]);
+    for (i = 0; i < n_sema; i++)
+        up(&xpd->wrch_sema);
     return ret;
 }
 
@@ -621,6 +800,7 @@ static int dma_host_to_device_pipe(struct xpu_pd *xpd, u64 dst, u64 src, u64 cps
         ret = -EFAULT;
         goto out_unlock;
     }
+    kl1_bounce_sync_for_device(edma[0], dmasz);
     ret = xpuhw_edma_read_start(edma[0], dev_off, (u64)edma[0]->dmabuf, dmasz);
     if (ret)
         goto out_unlock;
@@ -645,6 +825,7 @@ static int dma_host_to_device_pipe(struct xpu_pd *xpd, u64 dst, u64 src, u64 cps
             ret = -EFAULT;
             goto out_unlock;
         }
+        kl1_bounce_sync_for_device(edma[next], next_sz);
 
         ret = xpuhw_edma_read_wait(edma[ping], &cycles);
         inflight = false;
@@ -691,16 +872,173 @@ out_unlock:
     return ret;
 }
 
+/*
+ * S9 pageable pin-direct: pin_user_pages + dma_map_page + EDMA (no bounce memcpy).
+ * Returns 0 on full success, -EAGAIN to ask caller to use bounce, or other errno.
+ */
+static int dma_pageable_pin_d2h(struct xpu_pd *xpd, unsigned long dst_u, u64 src, u64 cpsz,
+                                u64 *total_cycles)
+{
+    struct page **pages;
+    struct xpu_edma *edma;
+    int ch = -1, ret = 0;
+    u64 done = 0, cycles = 0;
+
+    if (down_timeout(&xpd->wrch_sema, 60 * HZ))
+        return -XPUERR_TIMEOUT;
+    ch = get_wrch(xpd);
+    if (ch < 0) {
+        up(&xpd->wrch_sema);
+        return -EFAULT;
+    }
+    edma          = &xpd->wrch_edma[ch];
+    *total_cycles = 0;
+
+    pages = kvmalloc_array(KL1_PAGEABLE_PIN_MAXPG, sizeof(struct page *), GFP_KERNEL);
+    if (!pages) {
+        ret = -EAGAIN;
+        goto out_ch;
+    }
+
+    LOGL2("[xpu_%d] S9 pin D2H dst=0x%lx sz=0x%llx\n", xpd->devfile_id, dst_u, cpsz);
+
+    while (done < cpsz) {
+        unsigned long addr = dst_u + done;
+        unsigned int  pgoff = offset_in_page(addr);
+        u64           left = cpsz - done;
+        int           want, got, i;
+        size_t        batch_left;
+
+        want = (int)((pgoff + left + PAGE_SIZE - 1) >> PAGE_SHIFT);
+        if (want > KL1_PAGEABLE_PIN_MAXPG)
+            want = KL1_PAGEABLE_PIN_MAXPG;
+
+        got = pin_user_pages(addr, want, FOLL_WRITE, pages);
+        if (got <= 0) {
+            ret = -EAGAIN;
+            break;
+        }
+
+        batch_left = left;
+        for (i = 0; i < got && batch_left; i++) {
+            size_t chunk = min_t(size_t, batch_left, PAGE_SIZE - (i == 0 ? pgoff : 0));
+            unsigned int off = (i == 0) ? pgoff : 0;
+
+            ret = kl1_edma_d2h_page(edma, src + done, pages[i], off, chunk, &cycles);
+            if (ret) {
+                unpin_user_pages(pages, got);
+                /* Hard EDMA failure: do not silently bounce mid-transfer */
+                goto out_pages;
+            }
+            *total_cycles += cycles;
+            done += chunk;
+            batch_left -= chunk;
+        }
+        unpin_user_pages(pages, got);
+        if (ret)
+            break;
+    }
+
+out_pages:
+    kvfree(pages);
+out_ch:
+    put_wrch(xpd, ch);
+    up(&xpd->wrch_sema);
+    return ret;
+}
+
+static int dma_pageable_pin_h2d(struct xpu_pd *xpd, u64 dst, unsigned long src_u, u64 cpsz,
+                                u64 *total_cycles)
+{
+    struct page **pages;
+    struct xpu_edma *edma;
+    int ch = -1, ret = 0;
+    u64 done = 0, cycles = 0;
+
+    if (down_timeout(&xpd->rdch_sema, 60 * HZ))
+        return -XPUERR_TIMEOUT;
+    ch = get_rdch(xpd);
+    if (ch < 0) {
+        up(&xpd->rdch_sema);
+        return -EFAULT;
+    }
+    edma          = &xpd->rdch_edma[ch];
+    *total_cycles = 0;
+
+    pages = kvmalloc_array(KL1_PAGEABLE_PIN_MAXPG, sizeof(struct page *), GFP_KERNEL);
+    if (!pages) {
+        ret = -EAGAIN;
+        goto out_ch;
+    }
+
+    LOGL2("[xpu_%d] S9 pin H2D src=0x%lx sz=0x%llx\n", xpd->devfile_id, src_u, cpsz);
+
+    while (done < cpsz) {
+        unsigned long addr = src_u + done;
+        unsigned int  pgoff = offset_in_page(addr);
+        u64           left = cpsz - done;
+        int           want, got, i;
+        size_t        batch_left;
+
+        want = (int)((pgoff + left + PAGE_SIZE - 1) >> PAGE_SHIFT);
+        if (want > KL1_PAGEABLE_PIN_MAXPG)
+            want = KL1_PAGEABLE_PIN_MAXPG;
+
+        got = pin_user_pages(addr, want, 0, pages);
+        if (got <= 0) {
+            ret = -EAGAIN;
+            break;
+        }
+
+        batch_left = left;
+        for (i = 0; i < got && batch_left; i++) {
+            size_t chunk = min_t(size_t, batch_left, PAGE_SIZE - (i == 0 ? pgoff : 0));
+            unsigned int off = (i == 0) ? pgoff : 0;
+
+            ret = kl1_edma_h2d_page(edma, dst + done, pages[i], off, chunk, &cycles);
+            if (ret) {
+                unpin_user_pages(pages, got);
+                goto out_pages;
+            }
+            *total_cycles += cycles;
+            done += chunk;
+            batch_left -= chunk;
+        }
+        unpin_user_pages(pages, got);
+        if (ret)
+            break;
+    }
+
+out_pages:
+    kvfree(pages);
+out_ch:
+    put_rdch(xpd, ch);
+    up(&xpd->rdch_sema);
+    return ret;
+}
+
 /* Memcpy between device memory and host cpu memory (pageable bounce or S4 direct). */
 int dma_device_to_host(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *total_cycles)
 {
     struct mm_struct *mm = current->mm;
+    int               ret;
 
     if (kl1_dma_direct && mm && kl1_user_range_is_host_alloc(mm, (unsigned long)dst, cpsz))
         return dma_device_to_host_direct(xpd, (unsigned long)dst, src, cpsz, total_cycles);
 
     if (total_cycles == NULL)
         return -XPUERR_INVALID_PARAM;
+
+    /*
+     * S9: try pin+direct for large pageable buffers (eliminates bounce memcpy).
+     * Fall back to bounce on pin failure (-EAGAIN) or if disabled.
+     */
+    if (kl1_bounce_pipe && kl1_pageable_pin && cpsz >= KL1_PAGEABLE_PIN_MIN && mm) {
+        ret = dma_pageable_pin_d2h(xpd, (unsigned long)dst, src, cpsz, total_cycles);
+        if (ret != -EAGAIN)
+            return ret;
+        LOGL2("[xpu_%d] S9 pin D2H fallback bounce\n", xpd->devfile_id);
+    }
 
     /* Single chunk or pipe disabled → proven serial path only. */
     if (!kl1_bounce_pipe || cpsz <= KL1_DMA_KBUF_SIZE)
@@ -712,12 +1050,20 @@ int dma_device_to_host(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *tota
 int dma_host_to_device(struct xpu_pd *xpd, u64 dst, u64 src, u64 cpsz, u64 *total_cycles)
 {
     struct mm_struct *mm = current->mm;
+    int               ret;
 
     if (kl1_dma_direct && mm && kl1_user_range_is_host_alloc(mm, (unsigned long)src, cpsz))
         return dma_host_to_device_direct(xpd, dst, (unsigned long)src, cpsz, total_cycles);
 
     if (total_cycles == NULL)
         return -XPUERR_INVALID_PARAM;
+
+    if (kl1_bounce_pipe && kl1_pageable_pin && cpsz >= KL1_PAGEABLE_PIN_MIN && mm) {
+        ret = dma_pageable_pin_h2d(xpd, dst, (unsigned long)src, cpsz, total_cycles);
+        if (ret != -EAGAIN)
+            return ret;
+        LOGL2("[xpu_%d] S9 pin H2D fallback bounce\n", xpd->devfile_id);
+    }
 
     if (!kl1_bounce_pipe || cpsz <= KL1_DMA_KBUF_SIZE)
         return dma_host_to_device_serial(xpd, dst, src, cpsz, total_cycles);

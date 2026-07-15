@@ -20,6 +20,7 @@
 | S6 | pageable bounce 双缓冲（可回退） | 0.5–1 天 | S5 | **已完成** pageable H2D ~10 GB/s → `docs/impl/20260714-s6-bounce-pipeline.md` |
 | S7 | 回归门禁（正确性 + 带宽地板） | 0.5 天 | S4–S6 | **已完成** → `docs/impl/20260715-s7-regression-gate.md` |
 | S8 | 应用层 host_alloc + FP16 用法与 e2e 基准 | 0.5–1 天 | S4–S6 | **已完成** → `docs/impl/20260715-s8-app-guidance.md` |
+| S9 | pageable D2H 再优化 | 1–2 天 | S6 | **实验完结：无 D2H 增益** → `docs/impl/20260715-s9-pageable-d2h.md` |
 
 每阶段产出 `docs/impl/YYYYMMDD-<phase>-results.md`。
 

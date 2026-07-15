@@ -739,7 +739,11 @@ int  kl1_dma_peer_to_peer(struct xpu_pd *src_xpd, struct xpu_pd *dst_xpd, u64 ds
                           u64 sz, u64 *cycles);
 extern int kl1_p2p_stub;
 extern int kl1_dma_direct;
-extern int kl1_bounce_pipe; /* S6: pageable bounce double-buffer (0=serial legacy) */
+extern int kl1_bounce_pipe; /* S6/S9: pageable bounce pipeline (0=serial) */
+/* S9 D2H bounce style: 1=single-issue, 2=S6 dual-concurrent */
+extern int kl1_bounce_d2h;
+/* S9: pin pageable pages + EDMA direct (1=on, 0=bounce only) */
+extern int kl1_pageable_pin;
 int  kl1_mmap_host_alloc(struct xpu_pd *xpd, struct vm_area_struct *vma);
 bool kl1_user_range_is_host_alloc(struct mm_struct *mm, unsigned long uaddr, u64 len);
 int  kl1_host_alloc_get_page(struct mm_struct *mm, unsigned long uaddr, struct page **page_out,

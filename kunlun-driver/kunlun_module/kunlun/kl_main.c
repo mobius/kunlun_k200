@@ -678,11 +678,31 @@ int kl1_dma_direct = 1;
 module_param(kl1_dma_direct, int, 0644);
 MODULE_PARM_DESC(kl1_dma_direct, "KL1 direct EDMA for xpu_host_alloc (S4, 1=on, 0=bounce)");
 
-/* S6: overlap copy_{from,to}_user with EDMA on a second channel. 0 = legacy serial. */
+/* S6/S9: overlap copy_{from,to}_user with EDMA. 0 = legacy serial. */
 int kl1_bounce_pipe = 1;
 module_param(kl1_bounce_pipe, int, 0644);
 MODULE_PARM_DESC(kl1_bounce_pipe,
-                 "KL1 pageable bounce pipeline (1=double-buffer if 2 ch free, 0=serial)");
+                 "KL1 pageable bounce pipeline (1=on if 2+ ch free, 0=serial)");
+
+/*
+ * S9: D2H pipeline style when kl1_bounce_pipe=1.
+ * 1 = single-issue: at most one write EDMA in flight; copy overlaps next EDMA
+ *     (matches H2D shape; avoids dual write-engine contention — default).
+ * 2 = S6 dual-concurrent: start next EDMA before wait prev (more aggressive).
+ */
+int kl1_bounce_d2h = 1;
+module_param(kl1_bounce_d2h, int, 0644);
+MODULE_PARM_DESC(kl1_bounce_d2h,
+                 "KL1 D2H bounce style (1=single-issue S9, 2=dual-concurrent S6)");
+
+/*
+ * S9 pin-direct for pageable: only helps phys-contig/huge user memory.
+ * Default OFF — 4K-scattered malloc + per-page EDMA is much slower than bounce.
+ */
+int kl1_pageable_pin = 0;
+module_param(kl1_pageable_pin, int, 0644);
+MODULE_PARM_DESC(kl1_pageable_pin,
+                 "KL1 pin pageable pages for direct EDMA (0=default bounce; 1=pin path)");
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("BAIDU-ISA");

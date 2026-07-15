@@ -98,11 +98,11 @@ echo "Driver loaded:"
 modinfo kunlun | grep -E 'filename|version|srcversion|kl1_p2p|kl1_dma|kl1_bounce'
 sha256sum "$KO_DST" "$KO_SRC"
 
-for param in kl1_p2p_stub kl1_dma_direct kl1_bounce_pipe; do
+for param in kl1_p2p_stub kl1_dma_direct kl1_bounce_pipe kl1_bounce_d2h kl1_pageable_pin; do
     if [[ ! -f /sys/module/kunlun/parameters/${param} ]]; then
-        # kl1_bounce_pipe only on S6+ builds
-        if [[ "$param" == "kl1_bounce_pipe" ]]; then
-            echo "WARN: ${param} missing (pre-S6 module?)"
+        # Newer params may be missing on older modules
+        if [[ "$param" == kl1_bounce_* || "$param" == "kl1_pageable_pin" ]]; then
+            echo "WARN: ${param} missing (older module?)"
             continue
         fi
         die "${param} sysfs missing — loaded module does not match ${KO_SRC}. Reboot and rerun."
