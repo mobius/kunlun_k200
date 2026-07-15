@@ -120,6 +120,10 @@ make all
 make benchmarks/xpu_app_pipeline && ./benchmarks/xpu_app_pipeline -d 0
 # or: scripts/run_s8_app_bench.sh
 
+# Real cases C1 ResNet / C2 denoise / C3 dual-PD P2P
+make cases
+# or: scripts/run_c2_denoise.sh | run_c3_p2p_pipeline.sh | run_c1_resnet.sh
+
 # Driver regression gate (S7: correctness + S4/S5/S6 BW floors)
 make regression
 

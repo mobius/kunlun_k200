@@ -1,0 +1,4 @@
+S8 Paddle ResNet-50  2026-07-15 14:42:57
+batch=1  166.9 img/s  5.99 ms
+batch=8  249.2 img/s  32.10 ms
+batch=32  246.0 img/s  130.08 ms
