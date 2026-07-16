@@ -1,15 +1,17 @@
 # 下一阶段计划（驱动结案 + C1–C3 之后）
 
 **日期**: 2026-07-16  
+**状态**: Phase **N1+N2+N3 已实现**（A+B+C）→ 一页纸 `docs/impl/20260716-demo-one-pager.md`  
 **现状锚点**:
 
 | 层 | 状态 |
 |----|------|
 | 驱动 S0–S9 | **已结案** → `docs/impl/20260715-project-closure.md` |
-| 案例 C1–C3 | **已交付实测** → `docs/impl/20260715-real-cases-c1-c2-c3.md` |
+| 案例 C1–C5 | **已交付** → `results/cases/SUMMARY.md` |
+| 演示 | `make demo` / `scripts/run_demo.sh` |
 | 门禁 | `make regression` / `make cases` |
 
-**总方针**: 默认 **不再开驱动内核大改**；优先 **把现有案例做真、做稳、做可演示**，再按业务需要扩 C4/C5。
+**总方针**: 默认 **不再开驱动内核大改**；案例深耕 + 扩展 + 对外材料优先。
 
 ---
 

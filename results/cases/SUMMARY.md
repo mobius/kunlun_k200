@@ -1,27 +1,34 @@
-# Real cases summary (C1+C2+C3)
+# Real cases summary (A+B+C phase)
 
-- Date: 2026-07-15T14:43:12+08:00
+- Date: 2026-07-16T09:52:03
 - Driver: 1BF517814DF547139CD5FCE
-- Plan: `docs/plan/20260715-real-world-case-plan.md`
+- Plan: `docs/plan/20260716-next-phase-plan.md`
+- One-pager: `docs/impl/20260716-demo-one-pager.md`
 
 ## Headline numbers
 
 | Case | Metric | Result |
 |------|--------|--------|
-| **C2** Denoise 256² FP16 | host_alloc | **~100 img/s** (~10.0 ms) |
-| **C2** Denoise 256² FP16 | pageable | **~100 img/s** (~10.0 ms) |
-| **C3** Dual-PD + P2P | batch32 FC 4+4 | **1.44 ms/batch**, 22.2k samples/s |
-| **C3** Single-PD serial | same compute | **2.00 ms/batch**, 16.0k samples/s |
-| **C1** ResNet-50 FP32 | batch=1 | **166.9 img/s** |
-| **C1** ResNet-50 FP32 | batch=8 | **249.2 img/s** |
-| **C1** ResNet-50 FP32 | batch=32 | **246.0 img/s** |
-
-C3 dual/solo latency ratio ≈ **1.39×** (dual faster on this split).
-
-C1 note: historical ~1069 img/s @b1 was a different container/stack; this run is paddle 2.6.1 in toolchain image with alignment warnings — use as current-stack baseline.
+| **C2** Denoise 256² | host_alloc / pageable | **~100 img/s** both (compute-bound) |
+| **C3** Dual-PD + P2P | b32 f2048 | **~1.44 ms/batch** (~22.2k samp/s) |
+| **C3** Single-PD | same | **~2.00 ms/batch** (~16.0k); dual **~1.39×** |
+| **C4** MLP host_alloc FP16 | b32 / b64 / b128 | **~22.8k / ~42.2k / ~74.3k** img/s |
+| **C4** vs FP32 pageable | b32 | FP16 host_alloc **~1.8×** FP32 pageable |
+| **C5** Dual-card | sum/single efficiency | see c5_dual_card.md |
+| **C1** ResNet-50 | prior run b1/b8/b32 | **167 / 249 / 246** img/s (re-run with 64B align optional) |
 
 ## Reports
 
 - [c1_resnet50.md](c1_resnet50.md)
 - [c2_denoise.md](c2_denoise.md)
 - [c3_p2p_pipeline.md](c3_p2p_pipeline.md)
+- [c4_mlp.md](c4_mlp.md)
+- [c5_dual_card.md](c5_dual_card.md)
+
+## Commands
+
+```bash
+make demo          # quick C2/C3/C4
+make cases         # fuller suite
+DEMO_FULL=1 scripts/run_demo.sh
+```

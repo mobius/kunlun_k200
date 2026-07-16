@@ -58,8 +58,12 @@ regression: tests/test_p2p_verify tests/test_host_alloc tests/test_pageable_veri
 		tests/test_p2p benchmarks/xpu_perf_test
 	scripts/run_driver_regression.sh
 
-# Real-world cases C1+C2+C3 (see docs/plan/20260715-real-world-case-plan.md)
+# Real-world cases (see docs/plan/20260716-next-phase-plan.md)
 cases: benchmarks/xpu_denoise benchmarks/xpu_pipeline_p2p benchmarks/xpu_app_pipeline
 	scripts/run_real_cases.sh
 
-.PHONY: all clean run driver driver-install regression cases
+# Quick demo path (C2/C3/C4); DEMO_FULL=1 adds C1/C5; DEMO_REGRESSION=1 runs gate
+demo:
+	scripts/run_demo.sh
+
+.PHONY: all clean run driver driver-install regression cases demo

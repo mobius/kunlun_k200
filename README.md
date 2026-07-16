@@ -123,16 +123,32 @@ make all
 make benchmarks/xpu_app_pipeline && ./benchmarks/xpu_app_pipeline -d 0
 # or: scripts/run_s8_app_bench.sh
 
-# Real cases C1 ResNet / C2 denoise / C3 dual-PD P2P
+# Real cases C1–C5
 make cases
-# or: scripts/run_c2_denoise.sh | run_c3_p2p_pipeline.sh | run_c1_resnet.sh
 
-# Driver regression gate (S7: correctness + S4/S5/S6 BW floors)
+# 5-minute demo (quick C2/C3/C4)
+make demo
+# DEMO_FULL=1 scripts/run_demo.sh
+# DEMO_REGRESSION=1 scripts/run_demo.sh
+
+# Driver regression gate (S7)
 make regression
 
 # INT8 probe
 make benchmarks/xpu_int8_probe && ./benchmarks/xpu_int8_probe 0
 ```
+
+### Real cases
+
+| Case | Command | Report |
+|------|---------|--------|
+| C1 ResNet-50 | `scripts/run_c1_resnet.sh` | `results/cases/c1_resnet50.md` |
+| C2 Denoise | `scripts/run_c2_denoise.sh` | `results/cases/c2_denoise.md` |
+| C3 Dual-PD P2P | `scripts/run_c3_p2p_pipeline.sh` | `results/cases/c3_p2p_pipeline.md` |
+| C4 MLP tower | `scripts/run_c4_mlp.sh` | `results/cases/c4_mlp.md` |
+| C5 Dual-card | `scripts/run_c5_dual_card.sh` | `results/cases/c5_dual_card.md` |
+
+One-pager: `docs/impl/20260716-demo-one-pager.md` · Next plan: `docs/plan/20260716-next-phase-plan.md`
 
 ### Paddle inference
 
