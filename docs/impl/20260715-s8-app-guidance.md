@@ -82,7 +82,8 @@ Python / Paddle 侧：
 - batch 拉大以摊 launch 与 PCIe  
 - 本仓库脚本：`scripts/paddle_infer_benchmark.py`（需本机或容器内有 `paddlepaddle-xpu`）
 
-> 当前 `registry.baidubce.com/device/paddle-xpu:ubuntu20-...` 镜像 **未预装 paddle**，仅含工具链；历史 FP32 ResNet-50 ~1069 img/s (batch=1) 见 README。
+> 当前 `registry.baidubce.com/device/paddle-xpu:ubuntu20-...` 镜像 **未预装 paddle**，仅含工具链；`run_c1_resnet.sh` 会尝试安装 `paddlepaddle-xpu==2.6.1`。  
+> **现栈** ResNet-50 FP32：b1 ~167 / b8–32 ~250 img/s（`results/cases/c1_resnet50.md`）。历史 ~1069 img/s @b1 为旧容器/SDK 时代数字，**不是当前基线**。
 
 ---
 

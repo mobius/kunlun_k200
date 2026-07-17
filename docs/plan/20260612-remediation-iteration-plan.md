@@ -1,9 +1,12 @@
 # 未解决问题软件补救迭代计划
 
 **时间**: 2026-06-12  
+**状态**: S0–S9 **全部完成并结案**（2026-07-15）→ `docs/impl/20260715-project-closure.md`  
 **前置文档**:  
 - `docs/research/20260612-environment-and-feasibility.md`  
 - `docs/architecture/20260612-kl1-kl2-capability-gap.md`
+
+下文各阶段正文保留开工时的目标/设计描述；执行状态以 **§0 总览** 与结案文档为准。
 
 ---
 
@@ -227,15 +230,15 @@ dma_host_to_device():
 
 ---
 
-## 时间线
+## 时间线（实际）
 
 ```
-2026-06-12  评估文档 (research + architecture + plan)     ← 当前
-2026-06-13  S0 环境就绪 + 基线
-2026-06-14  S1 P2P host-staging 实现 + 测试
-2026-06-16  S2 host_alloc mmap 实现 + 测试
-2026-06-17  S3 INT8 探测
-2026-06-19  S4 评估（按需）
+2026-06-12  评估文档 (research + architecture + plan)
+2026-06-12  S0–S3 启动与完成（P2P/host_alloc/INT8 探测）
+2026-06-13  S4 host_alloc 直传 EDMA
+2026-07-14  S5 P2P ~11.2；S6 pageable pipe
+2026-07-15  S7–S9 + 驱动结案；C1–C3 案例
+2026-07-16  C4–C5 + demo / A+B+C
 ```
 
 ---

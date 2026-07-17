@@ -3,6 +3,7 @@
 **日期**: 2026-07-16  
 **硬件**: 2× Kunlun K200（4× XPU），PCIe Gen4×8，8GB HBM/设备，900 MHz  
 **软件**: 本仓库修改版 KL1 驱动 + xdnn 2.0 / XPURT 4.33  
+**驱动指纹**: `srcversion` 1BF517814DF547139CD5FCE  
 
 ---
 
@@ -23,11 +24,13 @@
 
 | 案例 | 结果 | 故事 |
 |------|------|------|
-| **C2 降噪** 256² FP16 | **~100 img/s** | 端到端图处理；大图更能体现 pinned |
-| **C3 双 PD+P2P** | dual **1.44 ms** vs solo **2.00 ms**（~1.39×） | 同卡两芯协作 |
-| **C1 ResNet-50** | b1 **167** / b8–32 **~250** img/s | 现栈基线（≠历史 1069） |
-| **C4 MLP 塔** | 见 `results/cases/c4_mlp.md` | FP16 + host_alloc 小模型批打分 |
-| **C5 双卡** | 见 `results/cases/c5_dual_card.md` | 弱耦合并行，无跨卡 P2P |
+| **C2** 降噪 256² FP16 | **~100 img/s** | 端到端图处理；大图更能体现 pinned |
+| **C3** 双 PD+P2P | dual **1.44 ms** vs solo **2.00 ms**（~1.39×） | 同卡两芯协作 |
+| **C1** ResNet-50 | b1 **167** / b8–32 **~250** img/s | **现栈基线**（≠历史 1069） |
+| **C4** MLP 塔 | b32 **~22.8k** / b64 **~42.2k** / b128 **~74.3k** img/s | FP16+host_alloc ~1.8× FP32 pageable |
+| **C5** 双卡弱耦合 | sum/single **~2.00×** | 无跨卡 P2P；两进程绑不同卡 |
+
+详情：`results/cases/SUMMARY.md`
 
 ---
 
@@ -60,6 +63,7 @@ less docs/impl/20260716-demo-one-pager.md
 - 8GB 装不下大 LLM / Flux；无训练友好通信  
 - pageable D2H 再抠驱动 **无效**（S9）；高 D2H 用 host_alloc  
 - C1 对齐/栈差异会拉低相对历史数字，以现报告为准  
+- C2 synth 权重、C4 FC 代理不是产线模型  
 
 ---
 
@@ -68,6 +72,8 @@ less docs/impl/20260716-demo-one-pager.md
 | 文档 | 用途 |
 |------|------|
 | `docs/impl/20260715-project-closure.md` | 驱动结案 |
-| `docs/impl/20260715-real-cases-c1-c2-c3.md` | 案例交付 |
-| `docs/plan/20260716-next-phase-plan.md` | 下一阶段计划 |
+| `docs/impl/20260715-real-cases-c1-c2-c3.md` | 案例 C1–C5 交付 |
+| `docs/plan/20260716-next-phase-plan.md` | A+B+C（N1–N3）完成记录 |
+| `docs/plan/20260716-phase-after-abc.md` | **下阶段**（P/Q/R/S/X） |
 | `results/cases/SUMMARY.md` | 最新数字 |
+| `README.md` | 仓库入口 |

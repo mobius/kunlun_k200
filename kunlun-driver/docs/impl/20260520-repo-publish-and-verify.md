@@ -2,6 +2,9 @@
 
 **主题**: 项目封装、GitHub 发布、构建验证
 
+> ⚠️ **历史记录**。§5「遗留问题」中的 P2P hang / host_alloc 未实现 **已在 S1–S5 解决**。  
+> 当前状态见仓库根目录 `docs/impl/20260715-project-closure.md`。
+
 ## 1. 仓库组织
 
 ### 1.1 清理冗余
@@ -58,11 +61,11 @@ Commits:
   76f1afd  Initial commit (LFS)
 ```
 
-## 5. 遗留问题
+## 5. 遗留问题（2026-05-20 当时）
 
-| 问题 | 状态 | 备注 |
+| 问题 | 当时状态 | 备注（结案后） |
 |------|:----:|------|
-| P2P DMA hang | 未解决 | SSE DMA 跨 PD 无响应 |
-| xpu_host_alloc | 未实现 | 需 KL1 mmap pgoff=0 支持 |
+| P2P DMA hang | 未解决 | **已解决**（S1/S5，同卡 ~11.2 GB/s） |
+| xpu_host_alloc | 未实现 | **已解决**（S2/S4，~12.5/12.9 GB/s） |
 | DMA buffer size | 无效 | 已回退 1MB→4MB 实验 |
-| INT8 GEMM | SDK 不支持 | xdnn API 不匹配 |
+| INT8 GEMM | SDK 不支持 | **仍不可用**（S3 固件无 INT8 CDNN） |

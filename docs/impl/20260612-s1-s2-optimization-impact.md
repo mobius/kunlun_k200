@@ -3,6 +3,9 @@
 **时间**: 2026-06-12  
 **前置**: `docs/impl/20260612-s1-p2p-fix-and-s2-mmap.md`（实施与验证记录）
 
+> ⚠️ **阶段性快照**：本文写于 S1/S2 刚完成后。其中「P2P ~2.5 GB/s」「host 零拷贝 DMA 未实现（S4 待做）」已被后续阶段取代：  
+> S4 host_alloc ~12.5/12.9、S5 P2P ~11.2、S6 pageable ~10/7.8 — 见 `docs/impl/20260715-project-closure.md`。
+
 ---
 
 ## 1. 结论摘要

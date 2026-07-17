@@ -1,7 +1,11 @@
 # Kunlun K200 性能测试总结报告
 
-> 测试时间: 2026-05-07
-> 测试环境: Podman 容器 (localhost/xpu-dev:22.04), Driver 4.33
+> ⚠️ **历史基线档案（优化前）** — 测试时间 **2026-05-07**。  
+> 文中 PCIe ~4.3 GB/s、P2P「未实现」等数字 **不是当前仓库状态**。  
+> **当前数字** 请看 `README.md`、`docs/impl/20260715-project-closure.md`、`results/cases/SUMMARY.md`。
+
+> 测试时间: 2026-05-07  
+> 测试环境: Podman 容器 (localhost/xpu-dev:22.04), Driver 4.33  
 > 硬件配置: 2 张 K200 卡, 4 个 XPU 设备 (/dev/xpu0-3)
 
 ---
