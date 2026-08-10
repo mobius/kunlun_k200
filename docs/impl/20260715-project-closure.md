@@ -46,18 +46,22 @@
 
 硬件上限（不在范围内）：SM 900 MHz 锁定、PCIe Gen4×8、无跨卡硬件 P2P、无 INT8 CDNN。
 
-生产驱动指纹（结案/案例机）：`srcversion` **1BF517814DF547139CD5FCE**。
+生产驱动指纹：以 `modinfo -F srcversion kunlun` 与仓库 `kunlun-driver/kunlun.ko` 对齐为准（随内核重编变化）。
 
 ---
 
 ## 4. 生产运维
 
 ```bash
-# 装载（默认参数）
-make driver
+# 装载（默认参数）— 脚本先落盘再 reload；卸失败则 reboot 一次
+make driver    # 内核小版本升级后必须重编（vermagic 必须 == uname -r）
 sudo KL1_P2P_STUB=0 KL1_DMA_DIRECT=1 KL1_BOUNCE_PIPE=1 scripts/install_driver.sh
 
-# 门禁
+# 门禁前确认是补丁驱动，不是 boot 后 DKMS 官方包
+modinfo -F srcversion,vermagic kunlun
+# 期望 srcversion 与仓库 build 的 kunlun.ko 一致（随重编变化）
+# 期望 vermagic 与 uname -r 一致；并存在 kl1_* sysfs
+
 make regression
 
 # 关键参数
@@ -68,11 +72,20 @@ kl1_pageable_pin=0    # 保持关（4K pin 极慢）
 kl1_p2p_stub=0
 ```
 
+### 装驱动注意（2026-08 补充）
+
+1. **装前检查**：`modinfo -F srcversion,vermagic kunlun` 与 `uname -r`、期望指纹。  
+2. **内核升级后**：先 `make driver` 再 `install_driver.sh`。  
+3. **`modprobe -r` 失败 / `/proc/modules` 显示 Unloading**：补丁 ko 应由脚本**已写入磁盘**；**只 reboot**，不要反复 `-r`。  
+4. 仅写盘、稍后重启：`sudo DISK_ONLY=1 scripts/install_driver.sh && sudo reboot`。  
+5. Boot 参数：`/etc/modprobe.d/kunlun-kl1.conf`（由 install 脚本维护）。
+
 回退示例：
 
 ```bash
 echo 0 > /sys/module/kunlun/parameters/kl1_dma_direct    # host_alloc 走 bounce
 echo 0 > /sys/module/kunlun/parameters/kl1_bounce_pipe   # pageable 串行
+# 或恢复备份 ko：kunlun.ko.bak.20260612 / kunlun.ko.bak.<timestamp>
 ```
 
 ---

@@ -23,7 +23,7 @@
 ## 2. 测试命令
 
 ```bash
-cd /mnt/storage/test_xpu
+# from repository root
 make benchmarks/xpu_int8_probe
 ./benchmarks/xpu_int8_probe 0
 

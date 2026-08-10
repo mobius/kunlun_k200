@@ -19,7 +19,7 @@
 | HBM 容量 | 8064 MB / 设备 |
 | L3 缓存 | 16 MB / 设备 |
 | 工作频率 | 900 MHz |
-| PCIe | 4:43:00.0 (dev0/1), 4:44:00.0 (dev2/3) |
+| PCIe | same-card pairs (BDF machine-local; redacted) |
 | 基线温度 | 36-38°C |
 | 基线功耗 | 37-38 W |
 

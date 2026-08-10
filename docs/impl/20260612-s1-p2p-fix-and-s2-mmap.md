@@ -36,8 +36,9 @@
 当前已加载模块与最新编译产物 hash 可能不一致。请执行：
 
 ```bash
-sudo /mnt/storage/test_xpu/scripts/install_driver.sh
-cd /mnt/storage/test_xpu && make tests/test_p2p_verify tests/test_p2p tests/test_host_alloc
+sudo scripts/install_driver.sh
+# from repo root
+make tests/test_p2p_verify tests/test_p2p tests/test_host_alloc
 
 ./tests/test_p2p_verify     # 期望: D2D PASS, P2P PASS
 ./tests/test_p2p            # 期望: P2P 带宽 ~2-4 GB/s
@@ -72,7 +73,7 @@ kbuf staging（`7b62285a...`）仍 hang（`test_p2p_verify` 45s+ 无输出）。
 新驱动 hash: `53f50a6d6a147e04474e7e6b9cecec36eb15b034386121a82204066f6b5103d0`
 
 ```bash
-sudo /mnt/storage/test_xpu/scripts/install_driver.sh
+sudo scripts/install_driver.sh
 timeout 60 ./tests/test_p2p_verify
 ./tests/test_p2p
 ```
@@ -111,7 +112,7 @@ note: test_ioctl_p2p_ exited with irqs disabled
 - chunk 间 `cond_resched()`
 
 ```bash
-sudo /mnt/storage/test_xpu/scripts/install_driver.sh
+sudo scripts/install_driver.sh
 sudo dmesg -C
 timeout 15 /tmp/test_ioctl_p2p_direct
 sudo dmesg | rg 'P2P|p2p'
@@ -120,7 +121,7 @@ sudo dmesg | rg 'P2P|p2p'
 已加 `LOGI` 跟踪（`xpu_ioctl.c` / `xpu_dma.c`），需再装一次驱动后：
 
 ```bash
-sudo /mnt/storage/test_xpu/scripts/install_driver.sh
+sudo scripts/install_driver.sh
 sudo dmesg -C
 timeout 15 /tmp/test_ioctl_p2p_direct
 sudo dmesg | rg 'P2P|p2p'

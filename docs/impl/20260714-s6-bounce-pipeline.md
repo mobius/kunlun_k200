@@ -84,7 +84,7 @@ wait last; copy last
 ## 5. 装载与验证
 
 ```bash
-cd /mnt/storage/test_xpu
+# from repository root
 make driver
 sudo KL1_P2P_STUB=0 KL1_DMA_DIRECT=1 KL1_BOUNCE_PIPE=1 scripts/install_driver.sh
 

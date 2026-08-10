@@ -103,7 +103,7 @@ Direct path 单次 EDMA 上限由 `KL1_DMA_KBUF_SIZE`(1MB) 提到 **2MB**（与 
 ## 6. 装载与验证
 
 ```bash
-cd /mnt/storage/test_xpu
+# from repository root
 make driver
 sudo KL1_P2P_STUB=0 KL1_DMA_DIRECT=1 scripts/install_driver.sh
 

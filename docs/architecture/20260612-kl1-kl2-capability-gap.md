@@ -12,14 +12,14 @@
 ## 1. 硬件拓扑
 
 ```
-Host (AMD EPYC 7402)
+Host (x86_64 server CPU)
   │
-  ├── PCIe Gen4 ×8 ── K200 Card #0 (43:00.0)
+  ├── PCIe Gen4 ×8 ── K200 Card #0 (PCI ID 1d22:3684)
   │     └── xpu_device
   │           ├── PD0 (/dev/xpu0)  rbase=0x00000000  HBM 0–8 GB
   │           └── PD1 (/dev/xpu1)  rbase=0x40000000  HBM 8–16 GB
   │
-  └── PCIe Gen4 ×8 ── K200 Card #1 (44:00.0)
+  └── PCIe Gen4 ×8 ── K200 Card #1 (same PCI ID; BDF machine-local)
         └── xpu_device
               ├── PD0 (/dev/xpu2)
               └── PD1 (/dev/xpu3)

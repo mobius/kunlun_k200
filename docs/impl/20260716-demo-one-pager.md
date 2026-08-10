@@ -3,7 +3,7 @@
 **日期**: 2026-07-16  
 **硬件**: 2× Kunlun K200（4× XPU），PCIe Gen4×8，8GB HBM/设备，900 MHz  
 **软件**: 本仓库修改版 KL1 驱动 + xdnn 2.0 / XPURT 4.33  
-**驱动指纹**: `srcversion` 1BF517814DF547139CD5FCE  
+**驱动指纹**: 以当次 `modinfo -F srcversion kunlun` 为准（随重编变化）  
 
 ---
 

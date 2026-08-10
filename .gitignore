@@ -32,3 +32,21 @@ tests/test_pinned2
 
 # Large tarball (already extracted)
 xdnn-ubuntu_x86_64.tar.gz
+
+# Xeon Phi / MPSS4 local vendor trees (large; do not commit)
+third_party/mpss4/
+third_party/jjkeijser-mpss/
+third_party/mpss-probe/
+
+# Local machine dumps (hostname / full lspci / serials) — keep out of git
+docs/research/*_hw.log
+docs/research/*_phase1*.log
+docs/research/*_modules_build.log
+docs/research/*_readiness.log
+*.force_ko_src
+.force_ko_src
+
+# Local-only driver backups / private notes
+kunlun.ko.patched.save
+**/kunlun.ko.bak*
+docs/private/

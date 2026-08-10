@@ -49,7 +49,7 @@
 ### 环境约束
 - 驱动替换需 root 权限
 - 不修改 `/usr/local/xpu-4.33.0` 全局安装
-- Python 依赖限定在 `/mnt/storage/test_xpu/.venv/`
+- Python 依赖限定在 `.venv/`
 
 ### 回滚
 ```bash
@@ -177,7 +177,7 @@ xpu_char_mmap(file, vma)
 ### Python 环境
 
 ```bash
-cd /mnt/storage/test_xpu
+# from repository root
 uv venv .venv
 source .venv/bin/activate
 uv pip install numpy  # 按需添加 paddle 相关

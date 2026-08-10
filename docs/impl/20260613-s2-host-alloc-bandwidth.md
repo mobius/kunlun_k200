@@ -19,7 +19,7 @@
 ## 2. 测试命令
 
 ```bash
-cd /mnt/storage/test_xpu
+# from repository root
 make benchmarks/xpu_perf_test
 ./benchmarks/xpu_perf_test 0 bw
 ```

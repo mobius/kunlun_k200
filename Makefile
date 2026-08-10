@@ -44,7 +44,22 @@ driver-install: driver
 	sudo KL1_P2P_STUB=$${KL1_P2P_STUB:-0} \
 		KL1_DMA_DIRECT=$${KL1_DMA_DIRECT:-1} \
 		KL1_BOUNCE_PIPE=$${KL1_BOUNCE_PIPE:-1} \
+		DISK_ONLY=$${DISK_ONLY:-0} \
 		scripts/install_driver.sh
+
+# Install without rebuild (uses existing kunlun-driver/kunlun.ko).
+driver-install-norebuild:
+	sudo KL1_P2P_STUB=$${KL1_P2P_STUB:-0} \
+		KL1_DMA_DIRECT=$${KL1_DMA_DIRECT:-1} \
+		KL1_BOUNCE_PIPE=$${KL1_BOUNCE_PIPE:-1} \
+		DISK_ONLY=$${DISK_ONLY:-0} \
+		scripts/install_driver.sh
+
+# Install arbitrary .ko to DKMS path only (no rebuild, no unload).
+# Example restore stock: make install-ko KO=/path/to/stock.ko
+install-ko:
+	@test -n "$(KO)" || (echo "usage: make install-ko KO=/path/to/kunlun.ko" >&2; exit 1)
+	sudo scripts/install_ko_file.sh "$(KO)"
 
 clean:
 	rm -f $(BENCHMARKS) $(TESTS)
@@ -66,4 +81,4 @@ cases: benchmarks/xpu_denoise benchmarks/xpu_pipeline_p2p benchmarks/xpu_app_pip
 demo:
 	scripts/run_demo.sh
 
-.PHONY: all clean run driver driver-install regression cases demo
+.PHONY: all clean run driver driver-install driver-install-norebuild install-ko regression cases demo

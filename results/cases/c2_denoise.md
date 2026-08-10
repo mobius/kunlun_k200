@@ -3,7 +3,7 @@
 - Date: 2026-07-16T09:51:45+08:00
 - Driver: 1BF517814DF547139CD5FCE
 - Device: 0  mode=quick  sizes=256  bench=5
-- Weights: /mnt/storage/test_xpu/data/xpu_denoise_synth.bin
+- Weights: data/xpu_denoise_synth.bin
 
 ## Results
 

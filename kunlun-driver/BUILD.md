@@ -31,19 +31,68 @@ strip --strip-debug kunlun.ko   # reduces to ~1.2 MB (same as DKMS install)
 
 ## Install
 
+**Preferred (repo root)** — installs to disk first, then reloads; if unload fails, reboot once:
+
 ```bash
-sudo modprobe -r kunlun                                    # unload current
-sudo cp kunlun.ko /lib/modules/$(uname -r)/updates/dkms/  # copy
-sudo depmod -a                                             # rebuild module map
-sudo modprobe kunlun                                       # load new module
+# from repository root
+make driver                          # must match $(uname -r) vermagic
+sudo KL1_P2P_STUB=0 KL1_DMA_DIRECT=1 KL1_BOUNCE_PIPE=1 \
+  scripts/install_driver.sh
+# or: make driver-install
 ```
+
+What the script does:
+
+1. **Copy** `kunlun-driver/kunlun.ko` → `/lib/modules/$(uname -r)/updates/dkms/kunlun.ko` + `depmod -a`
+2. Write boot defaults to `/etc/modprobe.d/kunlun-kl1.conf`
+3. Try unload/reload; if stuck or busy → **reboot** (do **not** loop `modprobe -r`)
+
+Disk-only (no unload; use before a planned reboot):
+
+```bash
+sudo DISK_ONLY=1 scripts/install_driver.sh
+sudo reboot
+```
+
+### Manual low-level sequence (if you must)
+
+```bash
+# 1) Install on disk FIRST (safe even if module is loaded)
+sudo cp kunlun.ko /lib/modules/$(uname -r)/updates/dkms/kunlun.ko
+sudo depmod -a
+echo 'options kunlun kl1_p2p_stub=0 kl1_dma_direct=1 kl1_bounce_pipe=1' | \
+  sudo tee /etc/modprobe.d/kunlun-kl1.conf
+
+# 2) Then reload — or reboot if unload fails
+sudo rmmod kunlun || sudo modprobe -r kunlun   # if this hangs/fails: reboot only
+sudo modprobe kunlun kl1_p2p_stub=0 kl1_dma_direct=1 kl1_bounce_pipe=1
+```
+
+**Do not** repeatedly `modprobe -r` when the module shows `Unloading` in `/proc/modules` — reboot.
+
+### Kernel upgrade
+
+After `uname -r` changes (e.g. 6.8.0-124 → 6.8.0-136), always:
+
+```bash
+make driver          # rebuild for new headers/vermagic
+sudo scripts/install_driver.sh
+```
+
+Stock DKMS may load a **non-patched** module at boot (`srcversion` ≠ repo). Check before benchmarks.
 
 ## Verify
 
 ```bash
-xpu_smi                          # should show all devices
-dmesg | grep -i kunlun | tail -5 # probe log
-strings kunlun.ko | grep ioctl_host_register  # confirm symbols present
+modinfo -F srcversion,vermagic,filename kunlun
+# expect: srcversion of this build (closure: 1BF517814DF547139CD5FCE)
+# expect: vermagic == $(uname -r)
+cat /sys/module/kunlun/parameters/kl1_dma_direct   # 1
+cat /sys/module/kunlun/parameters/kl1_bounce_pipe  # 1
+cat /sys/module/kunlun/parameters/kl1_p2p_stub     # 0
+ls /dev/xpu*                                     # xpu0–7 + xpuctrl
+xpu_smi
+dmesg | grep -i kunlun | tail -5
 ```
 
 ## Clean

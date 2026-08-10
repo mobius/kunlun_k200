@@ -3,7 +3,7 @@
 **日期**: 2026-07-15（C1–C3）/ 2026-07-16（C4–C5 与 N1 深耕）  
 **计划**: `docs/plan/20260715-real-world-case-plan.md`、`docs/plan/20260716-next-phase-plan.md`  
 **结果汇总**: `results/cases/SUMMARY.md`  
-**驱动**: `1BF517814DF547139CD5FCE`（结案生产参数）  
+**驱动**: 结案生产旋钮（`kl1_dma_direct=1` 等）；`srcversion` 随重编变化，见当次 `results/cases/*`  
 **文件名保留** `…c1-c2-c3…`（历史路径）；内容覆盖 **C1–C5**。
 
 ---

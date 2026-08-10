@@ -110,10 +110,10 @@ int ioctl_memcpy_p2p_kl1(struct xpu_pd *xpd, void __user *argp) {
 ## 5. 环境信息
 
 - **内核**: 6.8.0-111-generic, GCC 12.3.0
-- **模块**: build 于 `/mnt/storage/test_xpu/kunlun-driver/kunlun.ko`
-- **备份**: 原模块 `kunlun.ko.bak` (BuildID: 798c818f), 源文件 `/mnt/storage/test_xpu/kunlun.ko.orig`
+- **模块**: build 于 `kunlun-driver/kunlun.ko`
+- **备份**: 原模块 `kunlun.ko.bak` (BuildID: 798c818f), 源文件 `kunlun.ko.orig`
 - **XPURT**: `/usr/local/xpu-4.33.0/lib64/libxpurt.so.1`
-- **测试工具**: `/mnt/storage/test_xpu/tests/test_p2p_verify`, `tests/test_p2p`, `tests/test_bw`
+- **测试工具**: `tests/test_p2p_verify`, `tests/test_p2p`, `tests/test_bw`
 
 ## 6. 构建可复现性 (2026-05-20 验证)
 

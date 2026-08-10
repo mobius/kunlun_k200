@@ -69,7 +69,7 @@ D2H: dma_map_page(page) → edma_write(bus_addr ← dev) → dma_unmap
 ## 4. 测试步骤
 
 ```bash
-cd /mnt/storage/test_xpu
+# from repository root
 make driver
 sudo KL1_DMA_DIRECT=1 KL1_P2P_STUB=0 scripts/install_driver.sh
 
